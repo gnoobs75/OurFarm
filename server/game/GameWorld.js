@@ -3,7 +3,7 @@
 // processes player actions, and broadcasts updates.
 
 import { v4 as uuid } from 'uuid';
-import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER } from '../../shared/constants.js';
+import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES } from '../../shared/constants.js';
 import { isValidTile, tileIndex } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { DecorationGenerator } from './DecorationGenerator.js';
@@ -87,10 +87,10 @@ export class GameWorld {
       }
     }
 
-    // Plant starter corn at various growth stages
+    // Plant starter parsnip at various growth stages
     for (let px = cx + 2; px <= cx + 5; px++) {
       for (let pz = cz - 1; pz <= cz + 1; pz++) {
-        const crop = new Crop({ tileX: px, tileZ: pz, cropType: 'corn' });
+        const crop = new Crop({ tileX: px, tileZ: pz, cropType: 'parsnip' });
         crop.stage = 1 + ((px + pz) % 3); // stages 1, 2, 3
         this.crops.set(crop.id, crop);
       }
@@ -363,16 +363,25 @@ export class GameWorld {
         const quality = this._rollCropQuality(player.getSkillLevel(SKILLS.FARMING));
         player.addItem(crop.cropType, yield_, quality);
         player.addSkillXP(SKILLS.FARMING, cropData.xp);
-        this.crops.delete(id);
-
-        // Reset tile to tilled
-        const idx = tileIndex(data.x, data.z);
-        this.tiles[idx].type = TILE_TYPES.TILLED;
 
         logger.debug('FARM', `${player.name} harvested ${crop.cropType} x${yield_} at (${data.x},${data.z})`, {
-          xp: cropData.xp, totalXP: player.xp, level: player.level,
+          xp: cropData.xp, totalXP: player.xp, level: player.level, regrows: !!cropData.regrows,
         });
-        this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'cropHarvested', cropId: id, x: data.x, z: data.z });
+
+        if (cropData.regrows) {
+          // Regrowable: reset to mature stage, will grow back to harvestable
+          crop.stage = CROP_STAGES.MATURE;
+          crop.growth = 0;
+          crop.watered = false;
+          this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'cropUpdate', crop: crop.getState() });
+        } else {
+          // Non-regrowable: remove crop, reset tile
+          this.crops.delete(id);
+          const idx = tileIndex(data.x, data.z);
+          this.tiles[idx].type = TILE_TYPES.TILLED;
+          this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'cropHarvested', cropId: id, x: data.x, z: data.z });
+        }
+
         this._sendInventoryUpdate(socketId, player);
         break;
       }
