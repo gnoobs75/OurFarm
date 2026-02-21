@@ -20,6 +20,7 @@ import { HUD } from './ui/HUD.js';
 import { InventoryUI } from './ui/Inventory.js';
 import { DialogueUI } from './ui/DialogueUI.js';
 import { DebugWindow } from './ui/DebugWindow.js';
+import { ShopUI } from './ui/ShopUI.js';
 import { tileToWorld } from '@shared/TileMap.js';
 import { TILE_TYPES } from '@shared/constants.js';
 import { debugClient } from './utils/DebugClient.js';
@@ -49,6 +50,9 @@ async function main() {
   const dialogueUI = new DialogueUI(document.getElementById('dialogue-panel'));
   const debugWindow = new DebugWindow();
   debugWindow.setRenderer(sceneManager.renderer);
+  const shopUI = new ShopUI();
+  shopUI.onBuy = (itemId, qty) => network.sendBuy(itemId, qty);
+  shopUI.onSell = (itemId, qty) => network.sendSell(itemId, qty);
 
   // --- Network ---
   const network = new NetworkClient();
@@ -99,6 +103,9 @@ async function main() {
       sceneManager.panTo(localPlayer.x, localPlayer.z);
     }
 
+    // --- Track inventory for shop UI ---
+    let currentInventory = localPlayer?.inventory || [];
+
     // --- Current tool state ---
     let activeTool = 0;
     const toolActions = ['hoe', 'watering_can', 'pickaxe', 'axe', 'fishing_rod', 'seeds'];
@@ -110,7 +117,7 @@ async function main() {
 
     // --- Handle tile clicks ---
     input.on('tileClick', ({ tile, worldPos, button }) => {
-      if (dialogueUI.visible) return;
+      if (dialogueUI.visible || shopUI.visible) return;
 
       // Right-click or check for NPC
       const npcId = npcs.getNPCAtPosition(worldPos.x, worldPos.z);
@@ -149,6 +156,10 @@ async function main() {
 
     // --- Keyboard shortcuts ---
     input.on('keyDown', ({ key }) => {
+      if (key === 'Escape') {
+        if (shopUI.visible) shopUI.hide();
+        else if (inventoryUI.visible) inventoryUI.toggle();
+      }
       if (key === 'e' || key === 'E') inventoryUI.toggle();
       if (key === 'F3') debugWindow.toggle();
       if (key >= '1' && key <= '6') hud.selectSlot(parseInt(key) - 1);
@@ -185,7 +196,15 @@ async function main() {
           console.log('The fish got away...');
           break;
         case 'npcDialogue':
-          dialogueUI.show(data.npcName, data.text);
+          if (data.shopItems && data.shopItems.length > 0) {
+            dialogueUI.show(data.npcName, data.text);
+            setTimeout(() => {
+              dialogueUI.hide();
+              shopUI.show(data.npcName, data.shopItems, currentInventory);
+            }, 1500);
+          } else {
+            dialogueUI.show(data.npcName, data.text);
+          }
           break;
         case 'fullSync':
           crops.dispose();
@@ -206,6 +225,8 @@ async function main() {
     network.on('inventoryUpdate', (data) => {
       hud.updateStats(data);
       inventoryUI.update(data.inventory);
+      currentInventory = data.inventory;
+      shopUI.updateInventory(data.inventory);
     });
     network.on('playerJoin', (data) => {
       players.addPlayer(data.player, false);

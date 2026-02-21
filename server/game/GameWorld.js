@@ -523,14 +523,48 @@ export class GameWorld {
     }
 
     const dialogue = npc.getDialogue(rel.hearts);
+    const shopItems = this._getShopItems(npc);
     logger.debug('NPC', `${player.name} talked to ${npc.name}`, { hearts: rel.hearts });
     this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
       type: 'npcDialogue',
       npcId: npc.id,
       npcName: npc.name,
+      npcRole: npc.role,
       text: dialogue,
       hearts: rel.hearts,
+      shopItems,
     });
+  }
+
+  _getShopItems(npc) {
+    switch (npc.role) {
+      case 'Baker':
+        return Object.entries(cropsData)
+          .filter(([_, c]) => c.buyPrice > 0)
+          .map(([id, c]) => ({
+            itemId: id + '_seed',
+            name: id.replace(/_/g, ' ') + ' seeds',
+            price: c.buyPrice,
+            season: c.season,
+          }));
+      case 'Fisherman':
+        return [
+          { itemId: 'bait', name: 'Bait', price: 5 },
+          { itemId: 'crab_pot', name: 'Crab Pot', price: 200 },
+        ];
+      case 'Veterinarian':
+        return [
+          { itemId: 'hay', name: 'Hay', price: 50 },
+          { itemId: 'animal_medicine', name: 'Animal Medicine', price: 150 },
+        ];
+      case 'Blacksmith':
+        return [
+          { itemId: 'copper_bar', name: 'Copper Bar', price: 120 },
+          { itemId: 'iron_bar', name: 'Iron Bar', price: 250 },
+        ];
+      default:
+        return null;
+    }
   }
 
   handleShopBuy(socketId, data) {
