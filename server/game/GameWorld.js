@@ -204,6 +204,11 @@ export class GameWorld {
       player.energy = player.maxEnergy;
     }
 
+    // Save skills for all online players
+    for (const player of this.players.values()) {
+      this._savePlayerSkills(player);
+    }
+
     // Save state
     this._saveWorldState();
 
@@ -218,7 +223,20 @@ export class GameWorld {
   // --- Player Actions ---
 
   handlePlayerJoin(socket, data) {
-    const player = new Player({ name: data.name });
+    // Load or create persistent player in database
+    const db = getDB();
+    const playerId = data.playerId || uuid();
+    let row = db.prepare('SELECT * FROM players WHERE id = ?').get(playerId);
+    if (!row) {
+      db.prepare('INSERT INTO players (id, world_id, name) VALUES (?, ?, ?)')
+        .run(playerId, this.worldId, data.name || 'Farmer');
+      row = { id: playerId, name: data.name || 'Farmer' };
+    }
+
+    // Load saved skills from database
+    const skills = this._loadPlayerSkills(playerId);
+
+    const player = new Player({ id: playerId, name: data.name || row.name, skills });
     player.socketId = socket.id;
     this.players.set(socket.id, player);
 
@@ -238,6 +256,10 @@ export class GameWorld {
   handlePlayerLeave(socketId) {
     const player = this.players.get(socketId);
     if (!player) return;
+
+    // Save skills before removing
+    this._savePlayerSkills(player);
+
     logger.info('GAME', `${player.name} left`, { playerId: player.id, online: this.players.size - 1 });
     this.players.delete(socketId);
     this.io.emit(ACTIONS.PLAYER_LEAVE, { playerId: player.id });
@@ -491,6 +513,31 @@ export class GameWorld {
       time: this.time.getState(),
       weather: this.weather.getState(),
     };
+  }
+
+  // --- Skill Persistence ---
+
+  _loadPlayerSkills(playerId) {
+    const db = getDB();
+    const rows = db.prepare('SELECT skill, level, xp FROM player_skills WHERE player_id = ?').all(playerId);
+    const skills = {};
+    for (const row of rows) {
+      skills[row.skill] = { level: row.level, xp: row.xp };
+    }
+    return skills;
+  }
+
+  _savePlayerSkills(player) {
+    const db = getDB();
+    const stmt = db.prepare(
+      'INSERT OR REPLACE INTO player_skills (player_id, skill, level, xp) VALUES (?, ?, ?, ?)'
+    );
+    const saveAll = db.transaction(() => {
+      for (const [name, data] of Object.entries(player.skills)) {
+        stmt.run(player.id, name, data.level, data.xp);
+      }
+    });
+    saveAll();
   }
 
   _saveWorldState() {
