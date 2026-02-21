@@ -4,7 +4,7 @@
 // Supports multiple maps (farm, town) with portal transitions.
 
 import { v4 as uuid } from 'uuid';
-import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS } from '../../shared/constants.js';
+import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST } from '../../shared/constants.js';
 import { isValidTile, tileIndex } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { DecorationGenerator } from './DecorationGenerator.js';
@@ -433,7 +433,9 @@ export class GameWorld {
 
   handleTill(socketId, data) {
     const player = this.players.get(socketId);
-    if (!player || !player.useEnergy(2)) return;
+    if (!player) return;
+    const energyCost = TOOL_ENERGY_COST.hoe[player.toolTiers?.hoe || 0] || 2;
+    if (!player.useEnergy(energyCost)) return;
     if (player.currentMap !== MAP_IDS.FARM) return; // only on farm
     if (!isValidTile(data.x, data.z)) return;
 
@@ -474,7 +476,9 @@ export class GameWorld {
 
   handleWater(socketId, data) {
     const player = this.players.get(socketId);
-    if (!player || !player.useEnergy(1) || player.currentMap !== MAP_IDS.FARM) return;
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    const energyCost = TOOL_ENERGY_COST.watering_can[player.toolTiers?.watering_can || 0] || 1;
+    if (!player.useEnergy(energyCost)) return;
 
     const farmMap = this.maps.get(MAP_IDS.FARM);
     for (const crop of farmMap.crops.values()) {
@@ -489,6 +493,8 @@ export class GameWorld {
   handleHarvest(socketId, data) {
     const player = this.players.get(socketId);
     if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    const energyCost = TOOL_ENERGY_COST.pickaxe[player.toolTiers?.pickaxe || 0] || 3;
+    if (!player.useEnergy(energyCost)) return;
 
     const farmMap = this.maps.get(MAP_IDS.FARM);
     for (const [id, crop] of farmMap.crops.entries()) {
@@ -575,9 +581,23 @@ export class GameWorld {
     }
 
     const dialogue = npc.getDialogue(rel.hearts);
-    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+    const emitData = {
       type: 'npcDialogue', npcId: npc.id, npcName: npc.name, text: dialogue, hearts: rel.hearts,
-    });
+    };
+
+    // Include upgrade options for Blacksmith
+    if (npc.role === 'Blacksmith') {
+      const upgradeOptions = {};
+      for (const [tool, tier] of Object.entries(player.toolTiers)) {
+        if (tier < TOOL_TIERS.IRIDIUM) {
+          const cost = TOOL_UPGRADE_COST[tier + 1];
+          upgradeOptions[tool] = { currentTier: tier, nextTier: tier + 1, ...cost };
+        }
+      }
+      emitData.upgradeOptions = upgradeOptions;
+    }
+
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, emitData);
   }
 
   handleNPCGift(socketId, data) {
@@ -890,6 +910,32 @@ export class GameWorld {
     this.shippingBins.clear();
   }
 
+  handleToolUpgrade(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.TOWN) return;
+
+    const tool = data.tool;
+    if (!player.toolTiers || player.toolTiers[tool] === undefined) return;
+
+    const currentTier = player.toolTiers[tool];
+    const nextTier = currentTier + 1;
+    if (nextTier > TOOL_TIERS.IRIDIUM) return;
+
+    const cost = TOOL_UPGRADE_COST[nextTier];
+    if (!cost) return;
+    if (player.coins < cost.coins) return;
+    if (!player.hasItem(cost.bars, cost.barQty)) return;
+
+    player.coins -= cost.coins;
+    player.removeItem(cost.bars, cost.barQty);
+    player.toolTiers[tool] = nextTier;
+
+    this._sendInventoryUpdate(socketId, player);
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'toolUpgraded', tool, newTier: nextTier,
+    });
+  }
+
   // --- Helpers ---
 
   _rollCropQuality(farmingLevel) {
@@ -909,6 +955,7 @@ export class GameWorld {
       energy: player.energy,
       maxEnergy: player.maxEnergy,
       skills: player.skills,
+      toolTiers: player.toolTiers,
     });
   }
 

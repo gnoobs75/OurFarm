@@ -78,6 +78,7 @@ export class NetworkClient {
   sendSell(itemId, quantity) { this.socket.emit(ACTIONS.SHOP_SELL, { itemId, quantity }); }
   sendAnimalFeed(animalId) { this.socket.emit(ACTIONS.ANIMAL_FEED, { animalId }); }
   sendAnimalCollect(animalId) { this.socket.emit(ACTIONS.ANIMAL_COLLECT, { animalId }); }
+  sendToolUpgrade(tool) { this.socket.emit(ACTIONS.TOOL_UPGRADE, { tool }); }
   sendShipItem(itemId, quantity = 1) { this.socket.emit(ACTIONS.SHIP_ITEM, { itemId, quantity }); }
   sendChat(message) { this.socket.emit(ACTIONS.CHAT_MESSAGE, { message }); }
 

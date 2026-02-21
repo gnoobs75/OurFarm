@@ -11,8 +11,12 @@ export class Player {
     this.energy = data.energy ?? 100;
     this.maxEnergy = data.maxEnergy ?? 100;
     this.inventory = data.inventory || this._defaultInventory();
+    this.currentMap = data.currentMap || 'farm';
     this.activeToolSlot = 0;
     this.socketId = data.socketId;
+    this.toolTiers = data.toolTiers || {
+      hoe: 0, watering_can: 0, pickaxe: 0, axe: 0, fishing_rod: 0,
+    };
 
     // Skills — initialize all to 0/0
     this.skills = {};
@@ -108,13 +112,14 @@ export class Player {
   getState() {
     return {
       id: this.id, name: this.name,
-      x: this.x, z: this.z,
+      x: this.x, z: this.z, currentMap: this.currentMap,
       coins: this.coins,
       level: this.level,
       energy: Math.floor(this.energy),
       maxEnergy: this.maxEnergy,
       skills: this.skills,
       inventory: this.inventory,
+      toolTiers: this.toolTiers,
     };
   }
 }

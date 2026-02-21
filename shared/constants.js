@@ -91,6 +91,7 @@ export const ACTIONS = {
   ANIMAL_FEED: 'animal:feed',
   ANIMAL_COLLECT: 'animal:collect',
   SHIP_ITEM: 'ship:item',
+  TOOL_UPGRADE: 'tool:upgrade',
   WORLD_STATE: 'world:state',
   WORLD_UPDATE: 'world:update',
   TIME_UPDATE: 'time:update',
@@ -136,4 +137,22 @@ export const GIFT_POINTS = {
   NEUTRAL: 20,
   DISLIKED: -20,
   HATED: -40,
+};
+
+export const TOOL_TIERS = {
+  BASIC: 0, COPPER: 1, IRON: 2, GOLD: 3, IRIDIUM: 4,
+};
+
+export const TOOL_UPGRADE_COST = {
+  1: { bars: 'copper_bar', barQty: 5, coins: 2000 },
+  2: { bars: 'iron_bar', barQty: 5, coins: 5000 },
+  3: { bars: 'gold_bar', barQty: 5, coins: 10000 },
+  4: { bars: 'iridium_bar', barQty: 5, coins: 25000 },
+};
+
+export const TOOL_ENERGY_COST = {
+  hoe:          [2, 2, 1, 1, 0],
+  watering_can: [1, 1, 1, 0, 0],
+  pickaxe:      [3, 3, 2, 2, 1],
+  axe:          [2, 2, 1, 1, 0],
 };

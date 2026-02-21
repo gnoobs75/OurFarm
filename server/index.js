@@ -163,6 +163,9 @@ io.on('connection', (socket) => {
   wrap(ACTIONS.SHOP_BUY, (data) => world.handleShopBuy(socket.id, data));
   wrap(ACTIONS.SHOP_SELL, (data) => world.handleShopSell(socket.id, data));
 
+  // Tool upgrade
+  wrap(ACTIONS.TOOL_UPGRADE, (data) => world.handleToolUpgrade(socket.id, data));
+
   // Shipping bin
   wrap(ACTIONS.SHIP_ITEM, (data) => {
     const player = world.players.get(socket.id);

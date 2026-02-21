@@ -68,6 +68,11 @@ async function main() {
     }
   };
 
+  // Wire tool upgrade flow
+  dialogueUI.onToolUpgrade = (tool) => {
+    network.sendToolUpgrade(tool);
+  };
+
   // --- Network ---
   const network = new NetworkClient();
 
@@ -253,7 +258,7 @@ async function main() {
           break;
         case 'npcDialogue':
           dialogueUI._npcId = data.npcId;
-          dialogueUI.show(data.npcName, data.text);
+          dialogueUI.show(data.npcName, data.text, [], data.upgradeOptions || null);
           break;
         case 'animalUpdate':
           // Update the animal data stored in renderer
@@ -283,6 +288,9 @@ async function main() {
           break;
         case 'craftError':
           console.log(data.message);
+          break;
+        case 'toolUpgraded':
+          console.log(`Tool upgraded: ${data.tool} to tier ${data.newTier}`);
           break;
         case 'playerCollapse':
           console.log(`You collapsed! Lost ${data.penalty} coins.`);
