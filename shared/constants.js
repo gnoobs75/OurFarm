@@ -97,6 +97,7 @@ export const ACTIONS = {
   PLACE_MACHINE: 'machine:place',
   MACHINE_INPUT: 'machine:input',
   MACHINE_COLLECT: 'machine:collect',
+  FORAGE_COLLECT: 'forage:collect',
   WORLD_STATE: 'world:state',
   WORLD_UPDATE: 'world:update',
   TIME_UPDATE: 'time:update',
@@ -181,4 +182,11 @@ export const FERTILIZER_DATA = {
   fertilizer_quality: { qualityBonus: 0.25, speedBonus: 0 },
   speed_gro: { qualityBonus: 0, speedBonus: 0.10 },
   deluxe_speed_gro: { qualityBonus: 0, speedBonus: 0.25 },
+};
+
+export const FORAGE_ITEMS = {
+  0: ['daffodil', 'leek', 'dandelion', 'spring_onion'],
+  1: ['grape', 'spice_berry', 'sweet_pea', 'fiddlehead_fern'],
+  2: ['wild_plum', 'hazelnut', 'blackberry', 'chanterelle'],
+  3: ['crystal_fruit', 'crocus', 'snow_yam', 'winter_root'],
 };

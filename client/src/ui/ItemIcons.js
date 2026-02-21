@@ -81,6 +81,30 @@ const ITEMS = {
   preserves:          { emoji: '\u{1FAD9}', color: '#8B0000', name: 'Preserves' },
   cheese:             { emoji: '\u{1F9C0}', color: '#FFD700', name: 'Cheese' },
   mayonnaise:         { emoji: '\u{1F944}', color: '#FFFACD', name: 'Mayonnaise' },
+
+  // Spring forage
+  daffodil:           { emoji: '\u{1F33C}', color: '#FFD700', name: 'Daffodil' },
+  leek:               { emoji: '\u{1F96C}', color: '#228B22', name: 'Leek' },
+  dandelion:          { emoji: '\u{1F33B}', color: '#FFD700', name: 'Dandelion' },
+  spring_onion:       { emoji: '\u{1F9C5}', color: '#90EE90', name: 'Spring Onion' },
+
+  // Summer forage
+  grape:              { emoji: '\u{1F347}', color: '#6B3FA0', name: 'Grape' },
+  spice_berry:        { emoji: '\u{1FAD0}', color: '#FF4444', name: 'Spice Berry' },
+  sweet_pea:          { emoji: '\u{1F338}', color: '#FFB6C1', name: 'Sweet Pea' },
+  fiddlehead_fern:    { emoji: '\u{1F33F}', color: '#006400', name: 'Fiddlehead Fern' },
+
+  // Fall forage
+  wild_plum:          { emoji: '\u{1FAD0}', color: '#4B0082', name: 'Wild Plum' },
+  hazelnut:           { emoji: '\u{1F330}', color: '#8B4513', name: 'Hazelnut' },
+  blackberry:         { emoji: '\u{1FAD0}', color: '#1C1C1C', name: 'Blackberry' },
+  chanterelle:        { emoji: '\u{1F344}', color: '#FFB347', name: 'Chanterelle' },
+
+  // Winter forage
+  crystal_fruit:      { emoji: '\u{1F48E}', color: '#ADD8E6', name: 'Crystal Fruit' },
+  crocus:             { emoji: '\u{1F337}', color: '#9370DB', name: 'Crocus' },
+  snow_yam:           { emoji: '\u{1F954}', color: '#F5F5DC', name: 'Snow Yam' },
+  winter_root:        { emoji: '\u{1F955}', color: '#8B4513', name: 'Winter Root' },
 };
 
 const TOOLS = new Set(['hoe', 'watering_can', 'pickaxe', 'axe', 'fishing_rod']);

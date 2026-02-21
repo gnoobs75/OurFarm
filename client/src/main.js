@@ -11,6 +11,7 @@ import { WaterRenderer } from './world/WaterRenderer.js';
 import { CropRenderer } from './world/CropRenderer.js';
 import { SprinklerRenderer } from './world/SprinklerRenderer.js';
 import { MachineRenderer } from './world/MachineRenderer.js';
+import { ForageRenderer } from './world/ForageRenderer.js';
 import { WeatherRenderer } from './world/WeatherRenderer.js';
 import { BuildingRenderer } from './world/BuildingRenderer.js';
 import { DecorationRenderer } from './world/DecorationRenderer.js';
@@ -49,6 +50,7 @@ async function main() {
   const animals = new AnimalRenderer(sceneManager.scene, assets);
   const sprinklers = new SprinklerRenderer(sceneManager.scene);
   const machines = new MachineRenderer(sceneManager.scene);
+  let forage = new ForageRenderer(sceneManager.scene);
 
   // --- UI ---
   const hud = new HUD(document.getElementById('hud'));
@@ -108,6 +110,7 @@ async function main() {
     decorations.build(state.decorations || []);
     sprinklers.build(state.sprinklers || []);
     machines.build(state.machines || []);
+    forage.build(state.forageItems || []);
 
     // Ambient creatures (client-side only)
     let creatures = new AmbientCreatureRenderer(sceneManager.scene, state.tiles);
@@ -187,6 +190,7 @@ async function main() {
       }
 
       network.sendMove(worldPos.x, worldPos.z);
+      network.sendForageCollect(tile.x, tile.z);
     });
 
     // --- Left-click: Perform tool/item action ---
@@ -301,6 +305,9 @@ async function main() {
         case 'petUpdate':
           console.log(data.message);
           break;
+        case 'forageCollected':
+          forage.removeForageItem(data.spawnId);
+          break;
         case 'sprinklerPlaced':
           sprinklers.addSprinkler(data.sprinkler);
           break;
@@ -317,6 +324,8 @@ async function main() {
           sprinklers.build(data.sprinklers || []);
           machines.dispose();
           machines.build(data.machines || []);
+          forage.dispose();
+          forage.build(data.forageItems || []);
           break;
         case 'craftStarted':
           if (buildingsMap[data.buildingId]) {
@@ -358,6 +367,8 @@ async function main() {
           sprinklers.build(ms.sprinklers || []);
           machines.dispose();
           machines.build(ms.machines || []);
+          forage.dispose();
+          forage.build(data.forageItems || []);
           npcs.dispose();
           npcs.build(ms.npcs || []);
           pets.dispose();

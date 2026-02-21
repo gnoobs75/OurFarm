@@ -177,6 +177,9 @@ io.on('connection', (socket) => {
   wrap(ACTIONS.MACHINE_INPUT, (data) => world.handleMachineInput(socket.id, data));
   wrap(ACTIONS.MACHINE_COLLECT, (data) => world.handleMachineCollect(socket.id, data));
 
+  // Foraging
+  wrap(ACTIONS.FORAGE_COLLECT, (data) => world.handleForageCollect(socket.id, data));
+
   // Shipping bin
   wrap(ACTIONS.SHIP_ITEM, (data) => {
     const player = world.players.get(socket.id);

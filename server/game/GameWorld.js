@@ -4,7 +4,7 @@
 // Supports multiple maps (farm, town) with portal transitions.
 
 import { v4 as uuid } from 'uuid';
-import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA, FERTILIZER_DATA } from '../../shared/constants.js';
+import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA, FERTILIZER_DATA, FORAGE_ITEMS } from '../../shared/constants.js';
 import { isValidTile, tileIndex } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { DecorationGenerator } from './DecorationGenerator.js';
@@ -19,6 +19,7 @@ import { Animal } from '../entities/Animal.js';
 import { Sprinkler } from '../entities/Sprinkler.js';
 import { Machine } from '../entities/Machine.js';
 import { FishCalculator } from '../entities/Fish.js';
+import { ForagingSystem } from './ForagingSystem.js';
 import { getDB } from '../db/database.js';
 import { logger } from '../utils/Logger.js';
 
@@ -58,6 +59,10 @@ export class GameWorld {
     this.maps = new Map();
     this._initMaps();
     this._initStarterFarm();
+
+    // Foraging systems (one per map)
+    this.farmForaging = new ForagingSystem();
+    this.townForaging = new ForagingSystem();
 
     // Start tick loop
     this._tickInterval = null;
@@ -192,6 +197,12 @@ export class GameWorld {
   }
 
   start() {
+    // Spawn initial forage items
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const townMap = this.maps.get(MAP_IDS.TOWN);
+    this.farmForaging.spawnDaily(farmMap.tiles, this.time.season, 6);
+    this.townForaging.spawnDaily(townMap.tiles, this.time.season, 4);
+
     logger.info('WORLD', `GameWorld started. Tick rate: ${TICK_RATE}`);
     this._tickInterval = setInterval(() => this._tick(), 1000 / TICK_RATE);
   }
@@ -283,8 +294,13 @@ export class GameWorld {
     const newWeather = this.weather.onNewDay(this.time.season);
     this.io.emit(ACTIONS.WEATHER_UPDATE, { weather: newWeather });
 
-    // Sprinklers auto-water crops at dawn
+    // Spawn daily forage items
     const farmMap = this.maps.get(MAP_IDS.FARM);
+    const townMap = this.maps.get(MAP_IDS.TOWN);
+    this.farmForaging.spawnDaily(farmMap.tiles, this.time.season, 6);
+    this.townForaging.spawnDaily(townMap.tiles, this.time.season, 4);
+
+    // Sprinklers auto-water crops at dawn
     for (const sprinkler of farmMap.sprinklers.values()) {
       const wateredTiles = sprinkler.getWateredTiles();
       for (const t of wateredTiles) {
@@ -431,6 +447,10 @@ export class GameWorld {
     const targetMap = this.maps.get(newMap);
     const mapState = targetMap.getFullState();
 
+    const forageItems = newMap === MAP_IDS.FARM
+      ? this.farmForaging.getState()
+      : this.townForaging.getState();
+
     this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
       type: 'mapTransition',
       mapId: newMap,
@@ -438,6 +458,7 @@ export class GameWorld {
       spawnX: portal.spawnX,
       spawnZ: portal.spawnZ,
       season: this.time.season,
+      forageItems,
     });
 
     // Notify players on new map that this player joined
@@ -1088,6 +1109,33 @@ export class GameWorld {
     });
   }
 
+  // --- Foraging ---
+
+  handleForageCollect(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player) return;
+
+    const foraging = player.currentMap === MAP_IDS.FARM ? this.farmForaging : this.townForaging;
+    const spawn = foraging.collectAt(data.x, data.z);
+    if (!spawn) return;
+
+    const quality = this._rollForageQuality(player.getSkillLevel(SKILLS.FORAGING));
+    player.addItem(spawn.itemId, 1, quality);
+    player.addSkillXP(SKILLS.FORAGING, 7);
+
+    this._sendInventoryUpdate(socketId, player);
+    this._broadcastToMap(player.currentMap, ACTIONS.WORLD_UPDATE, {
+      type: 'forageCollected', spawnId: spawn.id,
+    });
+  }
+
+  _rollForageQuality(foragingLevel) {
+    const roll = Math.random();
+    if (roll < foragingLevel * 0.01) return 2;
+    if (roll < foragingLevel * 0.03) return 1;
+    return 0;
+  }
+
   // --- Helpers ---
 
   _rollCropQuality(farmingLevel, fertilizer = null) {
@@ -1138,7 +1186,10 @@ export class GameWorld {
       const pets = Array.from(map.pets.values()).map(p => p.getState());
       const sprinklers = Array.from(map.sprinklers.values()).map(s => s.getState());
       const machines = Array.from(map.machines.values()).map(m => m.getState());
-      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, { type: 'fullSync', crops, animals, pets, sprinklers, machines });
+      const forageItems = player.currentMap === MAP_IDS.FARM
+        ? this.farmForaging.getState()
+        : this.townForaging.getState();
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, { type: 'fullSync', crops, animals, pets, sprinklers, machines, forageItems });
     }
   }
 
@@ -1170,6 +1221,9 @@ export class GameWorld {
       time: this.time.getState(),
       weather: this.weather.getState(),
       recipes: recipesData,
+      forageItems: player.currentMap === MAP_IDS.FARM
+        ? this.farmForaging.getState()
+        : this.townForaging.getState(),
     };
   }
 
