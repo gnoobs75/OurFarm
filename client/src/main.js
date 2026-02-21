@@ -139,6 +139,9 @@ async function main() {
           network.sendHarvest(tile.x, tile.z);
           break;
       }
+
+      // Queue the tool animation on the local player
+      players.queueAction(network.playerId, tool);
     });
 
     // --- Keyboard shortcuts ---
