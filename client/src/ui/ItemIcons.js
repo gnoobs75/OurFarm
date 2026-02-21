@@ -68,6 +68,19 @@ const ITEMS = {
   fertilizer_quality: { emoji: '\u{1F9EA}', color: '#DAA520', name: 'Quality Fertilizer' },
   speed_gro:          { emoji: '\u{26A1}',  color: '#00AA00', name: 'Speed-Gro' },
   deluxe_speed_gro:   { emoji: '\u{26A1}',  color: '#00FF00', name: 'Deluxe Speed-Gro' },
+
+  // Machines
+  keg:                { emoji: '\u{1F6E2}', color: '#8B4513', name: 'Keg' },
+  preserves_jar:      { emoji: '\u{1FAD9}', color: '#AADDFF', name: 'Preserves Jar' },
+  cheese_press:       { emoji: '\u{1F9C0}', color: '#DEB887', name: 'Cheese Press' },
+  mayonnaise_machine: { emoji: '\u{1F95A}', color: '#EEEEDD', name: 'Mayonnaise Machine' },
+
+  // Artisan goods
+  wine:               { emoji: '\u{1F377}', color: '#722F37', name: 'Wine' },
+  juice:              { emoji: '\u{1F9C3}', color: '#FFA500', name: 'Juice' },
+  preserves:          { emoji: '\u{1FAD9}', color: '#8B0000', name: 'Preserves' },
+  cheese:             { emoji: '\u{1F9C0}', color: '#FFD700', name: 'Cheese' },
+  mayonnaise:         { emoji: '\u{1F944}', color: '#FFFACD', name: 'Mayonnaise' },
 };
 
 const TOOLS = new Set(['hoe', 'watering_can', 'pickaxe', 'axe', 'fishing_rod']);
@@ -89,6 +102,7 @@ export function getToolAction(itemId) {
   if (isSeed(itemId)) return 'seeds';
   if (itemId && itemId.startsWith('sprinkler_')) return 'sprinkler';
   if (itemId && (itemId.startsWith('fertilizer_') || itemId.includes('speed_gro'))) return 'fertilizer';
+  if (['keg', 'preserves_jar', 'cheese_press', 'mayonnaise_machine'].includes(itemId)) return 'machine';
   return null;
 }
 

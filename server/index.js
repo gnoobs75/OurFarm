@@ -172,6 +172,11 @@ io.on('connection', (socket) => {
   // Fertilizer application
   wrap(ACTIONS.APPLY_FERTILIZER, (data) => world.handleApplyFertilizer(socket.id, data));
 
+  // Processing machines
+  wrap(ACTIONS.PLACE_MACHINE, (data) => world.handlePlaceMachine(socket.id, data));
+  wrap(ACTIONS.MACHINE_INPUT, (data) => world.handleMachineInput(socket.id, data));
+  wrap(ACTIONS.MACHINE_COLLECT, (data) => world.handleMachineCollect(socket.id, data));
+
   // Shipping bin
   wrap(ACTIONS.SHIP_ITEM, (data) => {
     const player = world.players.get(socket.id);

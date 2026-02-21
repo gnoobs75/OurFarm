@@ -17,6 +17,7 @@ import { NPC } from '../entities/NPC.js';
 import { Pet } from '../entities/Pet.js';
 import { Animal } from '../entities/Animal.js';
 import { Sprinkler } from '../entities/Sprinkler.js';
+import { Machine } from '../entities/Machine.js';
 import { FishCalculator } from '../entities/Fish.js';
 import { getDB } from '../db/database.js';
 import { logger } from '../utils/Logger.js';
@@ -34,6 +35,7 @@ const animalsData = JSON.parse(readFileSync(join(dataDir, 'animals.json'), 'utf-
 const npcsData = JSON.parse(readFileSync(join(dataDir, 'npcs.json'), 'utf-8'));
 const fishData = JSON.parse(readFileSync(join(dataDir, 'fish.json'), 'utf-8'));
 const recipesData = JSON.parse(readFileSync(join(dataDir, 'recipes.json'), 'utf-8'));
+const machinesData = JSON.parse(readFileSync(join(dataDir, 'machines.json'), 'utf-8'));
 
 export class GameWorld {
   constructor(io) {
@@ -992,6 +994,100 @@ export class GameWorld {
     }
   }
 
+  // --- Processing Machines ---
+
+  handlePlaceMachine(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!player.hasItem(data.machineType, 1)) return;
+    if (!machinesData[data.machineType]) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+
+    // Don't place on existing machine
+    for (const m of farmMap.machines.values()) {
+      if (m.tileX === data.x && m.tileZ === data.z) return;
+    }
+
+    player.removeItem(data.machineType, 1);
+    const machine = new Machine({ type: data.machineType, tileX: data.x, tileZ: data.z });
+    farmMap.machines.set(machine.id, machine);
+
+    this._sendInventoryUpdate(socketId, player);
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'machinePlaced', machine: machine.getState(),
+    });
+  }
+
+  handleMachineInput(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const machine = farmMap.machines.get(data.machineId);
+    if (!machine || machine.processing) return;
+    if (!player.hasItem(data.itemId, 1)) return;
+
+    const machineInfo = machinesData[machine.type];
+    if (!machineInfo) return;
+
+    let outputItem, outputValue, timeHours;
+
+    for (const recipe of Object.values(machineInfo.recipes)) {
+      if (recipe.input && recipe.input === data.itemId) {
+        outputItem = recipe.output;
+        outputValue = recipe.outputValue;
+        timeHours = recipe.timeHours;
+        break;
+      }
+      if (recipe.inputCategory === 'crop') {
+        // Check if the item is a known crop
+        const cropInfo = cropsData[data.itemId];
+        if (cropInfo) {
+          outputItem = recipe.output;
+          if (recipe.valueMultiplier) {
+            outputValue = Math.floor(cropInfo.sellPrice * recipe.valueMultiplier);
+          }
+          if (recipe.valueBonus) {
+            outputValue = (outputValue || Math.floor(cropInfo.sellPrice * 2)) + recipe.valueBonus;
+          }
+          timeHours = recipe.timeHours;
+          break;
+        }
+      }
+    }
+
+    if (!outputItem || !timeHours) return;
+
+    player.removeItem(data.itemId, 1);
+    machine.startProcessing(data.itemId, outputItem, outputValue || 0, timeHours * 3600 * 1000);
+
+    this._sendInventoryUpdate(socketId, player);
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'machineUpdate', machine: machine.getState(),
+    });
+  }
+
+  handleMachineCollect(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const machine = farmMap.machines.get(data.machineId);
+    if (!machine) return;
+
+    const result = machine.collect();
+    if (!result) return;
+
+    player.addItem(result.itemId, 1);
+    player.addSkillXP(SKILLS.FARMING, 10);
+
+    this._sendInventoryUpdate(socketId, player);
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'machineUpdate', machine: machine.getState(),
+    });
+  }
+
   // --- Helpers ---
 
   _rollCropQuality(farmingLevel, fertilizer = null) {
@@ -1041,7 +1137,8 @@ export class GameWorld {
       const animals = Array.from(map.animals.values()).map(a => a.getState());
       const pets = Array.from(map.pets.values()).map(p => p.getState());
       const sprinklers = Array.from(map.sprinklers.values()).map(s => s.getState());
-      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, { type: 'fullSync', crops, animals, pets, sprinklers });
+      const machines = Array.from(map.machines.values()).map(m => m.getState());
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, { type: 'fullSync', crops, animals, pets, sprinklers, machines });
     }
   }
 
@@ -1067,6 +1164,7 @@ export class GameWorld {
       pets: mapState.pets,
       npcs: mapState.npcs,
       sprinklers: mapState.sprinklers,
+      machines: mapState.machines,
       players: samePlayers,
       buildings: mapState.buildings,
       time: this.time.getState(),

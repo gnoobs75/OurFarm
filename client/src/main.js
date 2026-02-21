@@ -10,6 +10,7 @@ import { TerrainRenderer } from './world/TerrainRenderer.js';
 import { WaterRenderer } from './world/WaterRenderer.js';
 import { CropRenderer } from './world/CropRenderer.js';
 import { SprinklerRenderer } from './world/SprinklerRenderer.js';
+import { MachineRenderer } from './world/MachineRenderer.js';
 import { WeatherRenderer } from './world/WeatherRenderer.js';
 import { BuildingRenderer } from './world/BuildingRenderer.js';
 import { DecorationRenderer } from './world/DecorationRenderer.js';
@@ -47,6 +48,7 @@ async function main() {
   const pets = new PetRenderer(sceneManager.scene, assets);
   const animals = new AnimalRenderer(sceneManager.scene, assets);
   const sprinklers = new SprinklerRenderer(sceneManager.scene);
+  const machines = new MachineRenderer(sceneManager.scene);
 
   // --- UI ---
   const hud = new HUD(document.getElementById('hud'));
@@ -105,6 +107,7 @@ async function main() {
     buildings.build(state.buildings);
     decorations.build(state.decorations || []);
     sprinklers.build(state.sprinklers || []);
+    machines.build(state.machines || []);
 
     // Ambient creatures (client-side only)
     let creatures = new AmbientCreatureRenderer(sceneManager.scene, state.tiles);
@@ -144,6 +147,22 @@ async function main() {
     // --- Right-click: Move player ---
     input.on('tileMove', ({ tile, worldPos }) => {
       if (dialogueUI.visible) return;
+
+      // Check for machine interaction
+      const machineId = machines.getMachineAtPosition(worldPos.x, worldPos.z);
+      if (machineId) {
+        const machineEntry = machines.machineMeshes.get(machineId);
+        if (machineEntry && machineEntry.data.processing && machineEntry.data.processing.ready) {
+          network.sendMachineCollect(machineId);
+        } else if (machineEntry && !machineEntry.data.processing) {
+          // Send the active item as input
+          const activeItem = hud.getActiveItem();
+          if (activeItem && activeItem.itemId) {
+            network.sendMachineInput(machineId, activeItem.itemId);
+          }
+        }
+        return;
+      }
 
       // Check for animal interaction
       const animalId = animals.getAnimalAtPosition(worldPos.x, worldPos.z);
@@ -203,6 +222,9 @@ async function main() {
           break;
         case 'fertilizer':
           network.sendApplyFertilizer(activeItem.itemId, tile.x, tile.z);
+          break;
+        case 'machine':
+          network.sendPlaceMachine(activeItem.itemId, tile.x, tile.z);
           break;
       }
 
@@ -282,11 +304,19 @@ async function main() {
         case 'sprinklerPlaced':
           sprinklers.addSprinkler(data.sprinkler);
           break;
+        case 'machinePlaced':
+          machines.addMachine(data.machine);
+          break;
+        case 'machineUpdate':
+          machines.updateMachine(data.machine);
+          break;
         case 'fullSync':
           crops.dispose();
           crops.build(data.crops);
           sprinklers.dispose();
           sprinklers.build(data.sprinklers || []);
+          machines.dispose();
+          machines.build(data.machines || []);
           break;
         case 'craftStarted':
           if (buildingsMap[data.buildingId]) {
@@ -326,6 +356,8 @@ async function main() {
           crops.build(ms.crops || []);
           sprinklers.dispose();
           sprinklers.build(ms.sprinklers || []);
+          machines.dispose();
+          machines.build(ms.machines || []);
           npcs.dispose();
           npcs.build(ms.npcs || []);
           pets.dispose();

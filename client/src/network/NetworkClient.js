@@ -81,6 +81,9 @@ export class NetworkClient {
   sendToolUpgrade(tool) { this.socket.emit(ACTIONS.TOOL_UPGRADE, { tool }); }
   sendPlaceSprinkler(sprinklerType, x, z) { this.socket.emit(ACTIONS.PLACE_SPRINKLER, { sprinklerType, x, z }); }
   sendApplyFertilizer(fertilizerType, x, z) { this.socket.emit(ACTIONS.APPLY_FERTILIZER, { fertilizerType, x, z }); }
+  sendPlaceMachine(machineType, x, z) { this.socket.emit(ACTIONS.PLACE_MACHINE, { machineType, x, z }); }
+  sendMachineInput(machineId, itemId) { this.socket.emit(ACTIONS.MACHINE_INPUT, { machineId, itemId }); }
+  sendMachineCollect(machineId) { this.socket.emit(ACTIONS.MACHINE_COLLECT, { machineId }); }
   sendShipItem(itemId, quantity = 1) { this.socket.emit(ACTIONS.SHIP_ITEM, { itemId, quantity }); }
   sendChat(message) { this.socket.emit(ACTIONS.CHAT_MESSAGE, { message }); }
 
