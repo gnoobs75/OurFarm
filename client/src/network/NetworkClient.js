@@ -86,6 +86,7 @@ export class NetworkClient {
   sendMachineCollect(machineId) { this.socket.emit(ACTIONS.MACHINE_COLLECT, { machineId }); }
   sendForageCollect(x, z) { this.socket.emit(ACTIONS.FORAGE_COLLECT, { x, z }); }
   sendShipItem(itemId, quantity = 1) { this.socket.emit(ACTIONS.SHIP_ITEM, { itemId, quantity }); }
+  sendProfessionChoice(skill, professionId) { this.socket.emit(ACTIONS.PROFESSION_CHOICE, { skill, professionId }); }
   sendChat(message) { this.socket.emit(ACTIONS.CHAT_MESSAGE, { message }); }
 
   // ─── Event system ───

@@ -24,6 +24,7 @@ import { HUD } from './ui/HUD.js';
 import { InventoryUI } from './ui/Inventory.js';
 import { DialogueUI } from './ui/DialogueUI.js';
 import { CraftingUI } from './ui/CraftingUI.js';
+import { ProfessionUI } from './ui/ProfessionUI.js';
 import { DebugWindow } from './ui/DebugWindow.js';
 import { getToolAction, isSeed } from './ui/ItemIcons.js';
 import { tileToWorld } from '@shared/TileMap.js';
@@ -59,6 +60,7 @@ async function main() {
   const debugWindow = new DebugWindow();
   debugWindow.setRenderer(sceneManager.renderer);
   const craftingUI = new CraftingUI();
+  const professionUI = new ProfessionUI();
 
   // Wire backpack right-click → action bar quick-add
   inventoryUI.onQuickAdd = (itemId) => {
@@ -125,6 +127,11 @@ async function main() {
     // Wire crafting callbacks
     craftingUI.onCraftStart = (buildingId, recipeId) => network.sendCraftStart(buildingId, recipeId);
     craftingUI.onCraftCollect = (buildingId) => network.sendCraftCollect(buildingId);
+
+    // Wire profession choice callback
+    professionUI.onChoice = (skill, professionId) => {
+      network.sendProfessionChoice(skill, professionId);
+    };
 
     // Add players
     for (const p of state.players) {
@@ -347,6 +354,12 @@ async function main() {
           break;
         case 'playerCollapse':
           console.log(`You collapsed! Lost ${data.penalty} coins.`);
+          break;
+        case 'professionChoice':
+          professionUI.show(data.skill, data.level, data.options);
+          break;
+        case 'professionChosen':
+          console.log(`Chose ${data.professionId} for ${data.skill}!`);
           break;
         case 'mapTransition': {
           // Rebuild world from new map state

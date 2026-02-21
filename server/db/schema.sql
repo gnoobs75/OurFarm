@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS players (
   level INTEGER DEFAULT 1,
   energy REAL DEFAULT 100,
   max_energy REAL DEFAULT 100,
+  professions TEXT DEFAULT '{}',
   FOREIGN KEY (world_id) REFERENCES worlds(id)
 );
 

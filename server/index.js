@@ -180,6 +180,9 @@ io.on('connection', (socket) => {
   // Foraging
   wrap(ACTIONS.FORAGE_COLLECT, (data) => world.handleForageCollect(socket.id, data));
 
+  // Profession choice
+  wrap(ACTIONS.PROFESSION_CHOICE, (data) => world.handleProfessionChoice(socket.id, data));
+
   // Shipping bin
   wrap(ACTIONS.SHIP_ITEM, (data) => {
     const player = world.players.get(socket.id);

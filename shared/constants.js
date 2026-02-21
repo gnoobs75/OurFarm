@@ -98,6 +98,7 @@ export const ACTIONS = {
   MACHINE_INPUT: 'machine:input',
   MACHINE_COLLECT: 'machine:collect',
   FORAGE_COLLECT: 'forage:collect',
+  PROFESSION_CHOICE: 'profession:choice',
   WORLD_STATE: 'world:state',
   WORLD_UPDATE: 'world:update',
   TIME_UPDATE: 'time:update',
@@ -189,4 +190,87 @@ export const FORAGE_ITEMS = {
   1: ['grape', 'spice_berry', 'sweet_pea', 'fiddlehead_fern'],
   2: ['wild_plum', 'hazelnut', 'blackberry', 'chanterelle'],
   3: ['crystal_fruit', 'crocus', 'snow_yam', 'winter_root'],
+};
+
+export const PROFESSIONS = {
+  farming: {
+    5: [
+      { id: 'rancher', name: 'Rancher', description: '+20% animal product value', bonus: { animalProductValue: 0.20 } },
+      { id: 'tiller', name: 'Tiller', description: '+10% crop sell value', bonus: { cropSellValue: 0.10 } },
+    ],
+    10: {
+      rancher: [
+        { id: 'coopmaster', name: 'Coopmaster', description: 'Incubation time halved', bonus: { incubationSpeed: 0.5 } },
+        { id: 'shepherd', name: 'Shepherd', description: 'Animals befriend faster', bonus: { animalFriendship: 0.5 } },
+      ],
+      tiller: [
+        { id: 'artisan', name: 'Artisan', description: '+40% artisan goods value', bonus: { artisanValue: 0.40 } },
+        { id: 'agriculturist', name: 'Agriculturist', description: '+10% crop growth speed', bonus: { cropGrowth: 0.10 } },
+      ],
+    },
+  },
+  fishing: {
+    5: [
+      { id: 'fisher', name: 'Fisher', description: '+25% fish sell value', bonus: { fishSellValue: 0.25 } },
+      { id: 'trapper', name: 'Trapper', description: 'Crab pots no bait needed', bonus: { noBait: true } },
+    ],
+    10: {
+      fisher: [
+        { id: 'angler', name: 'Angler', description: '+50% fish sell value', bonus: { fishSellValue: 0.50 } },
+        { id: 'pirate', name: 'Pirate', description: 'Double treasure chance', bonus: { treasureChance: 2 } },
+      ],
+      trapper: [
+        { id: 'mariner', name: 'Mariner', description: 'No junk in crab pots', bonus: { noJunk: true } },
+        { id: 'luremaster', name: 'Luremaster', description: 'No bait needed for fishing', bonus: { noBaitFishing: true } },
+      ],
+    },
+  },
+  mining: {
+    5: [
+      { id: 'miner', name: 'Miner', description: '+1 ore per node', bonus: { oreBonus: 1 } },
+      { id: 'geologist', name: 'Geologist', description: '+50% gem chance', bonus: { gemChance: 0.5 } },
+    ],
+    10: {
+      miner: [
+        { id: 'blacksmith_prof', name: 'Blacksmith', description: '+50% bar sell value', bonus: { barSellValue: 0.5 } },
+        { id: 'prospector', name: 'Prospector', description: 'Double coal finds', bonus: { coalDouble: true } },
+      ],
+      geologist: [
+        { id: 'excavator', name: 'Excavator', description: 'Double geode finds', bonus: { geodeDouble: true } },
+        { id: 'gemologist', name: 'Gemologist', description: '+30% gem sell value', bonus: { gemSellValue: 0.3 } },
+      ],
+    },
+  },
+  foraging: {
+    5: [
+      { id: 'forester', name: 'Forester', description: '+25% wood from trees', bonus: { woodBonus: 0.25 } },
+      { id: 'gatherer', name: 'Gatherer', description: '20% chance double forage', bonus: { doubleForage: 0.2 } },
+    ],
+    10: {
+      forester: [
+        { id: 'lumberjack', name: 'Lumberjack', description: 'Hardwood from any tree', bonus: { hardwoodAll: true } },
+        { id: 'tapper_prof', name: 'Tapper', description: 'Tree syrup 2x faster', bonus: { tapperSpeed: 2 } },
+      ],
+      gatherer: [
+        { id: 'botanist', name: 'Botanist', description: 'Forage always best quality', bonus: { forageQuality: 'gold' } },
+        { id: 'tracker', name: 'Tracker', description: 'Forage locations shown on map', bonus: { forageTracker: true } },
+      ],
+    },
+  },
+  combat: {
+    5: [
+      { id: 'fighter', name: 'Fighter', description: '+15% attack damage', bonus: { attackDamage: 0.15 } },
+      { id: 'scout', name: 'Scout', description: '+50% crit chance', bonus: { critChance: 0.5 } },
+    ],
+    10: {
+      fighter: [
+        { id: 'brute', name: 'Brute', description: '+15% more attack damage', bonus: { attackDamage: 0.15 } },
+        { id: 'defender', name: 'Defender', description: '+25 max HP', bonus: { maxHP: 25 } },
+      ],
+      scout: [
+        { id: 'acrobat', name: 'Acrobat', description: 'Cooldown halved', bonus: { cooldownReduction: 0.5 } },
+        { id: 'desperado', name: 'Desperado', description: 'Crit damage doubled', bonus: { critDamage: 2 } },
+      ],
+    },
+  },
 };

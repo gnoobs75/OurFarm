@@ -4,7 +4,7 @@
 // Supports multiple maps (farm, town) with portal transitions.
 
 import { v4 as uuid } from 'uuid';
-import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA, FERTILIZER_DATA, FORAGE_ITEMS } from '../../shared/constants.js';
+import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA, FERTILIZER_DATA, FORAGE_ITEMS, PROFESSIONS } from '../../shared/constants.js';
 import { isValidTile, tileIndex } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { DecorationGenerator } from './DecorationGenerator.js';
@@ -374,7 +374,8 @@ export class GameWorld {
     }
 
     const skills = this._loadPlayerSkills(playerId);
-    const player = new Player({ id: playerId, name: data.name || row.name, skills });
+    const professions = row.professions ? JSON.parse(row.professions) : {};
+    const player = new Player({ id: playerId, name: data.name || row.name, skills, professions });
     player.socketId = socket.id;
     this.players.set(socket.id, player);
 
@@ -542,6 +543,7 @@ export class GameWorld {
         const quality = this._rollCropQuality(player.getSkillLevel(SKILLS.FARMING), crop.fertilizer);
         player.addItem(crop.cropType, yield_, quality);
         player.addSkillXP(SKILLS.FARMING, cropData.xp);
+        this._checkPendingProfession(socketId, player);
 
         if (cropData.regrows) {
           crop.stage = CROP_STAGES.MATURE;
@@ -578,6 +580,7 @@ export class GameWorld {
     if (fish) {
       player.addItem(fish.id, 1);
       player.addSkillXP(SKILLS.FISHING, 5 + fish.rarity * 10);
+      this._checkPendingProfession(socketId, player);
       this._broadcastToMap(player.currentMap, ACTIONS.WORLD_UPDATE, {
         type: 'fishCaught', playerId: player.id, fish,
       });
@@ -750,6 +753,7 @@ export class GameWorld {
     const quality = result.qualityBonus > 1 ? 1 : 0;
     player.addItem(animalData.product, 1, quality);
     player.addSkillXP(SKILLS.FARMING, 5);
+    this._checkPendingProfession(socketId, player);
 
     this._sendInventoryUpdate(socketId, player);
     this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
@@ -860,6 +864,7 @@ export class GameWorld {
 
     player.addItem(recipe.output, recipe.count || 1);
     player.addSkillXP(SKILLS.FARMING, recipe.xp || 5);
+    this._checkPendingProfession(socketId, player);
     building.processing = null;
 
     this._sendInventoryUpdate(socketId, player);
@@ -892,15 +897,30 @@ export class GameWorld {
     if (!player.hasItem(data.itemId, quantity)) return;
 
     const cropData = cropsData[data.itemId];
-    let basePrice = cropData?.sellPrice || 10;
+    const fishItem = fishData[data.itemId];
+    let basePrice = cropData?.sellPrice || fishItem?.value || 10;
 
     const slot = player.inventory.find(i => i.itemId === data.itemId);
     const quality = slot?.quality || 0;
-    const price = Math.floor(basePrice * QUALITY_MULTIPLIER[quality]) * quantity;
+    let price = Math.floor(basePrice * QUALITY_MULTIPLIER[quality]) * quantity;
+
+    // Tiller profession: +10% crop sell value
+    if (cropData && player.hasProfession('tiller')) {
+      price = Math.floor(price * 1.1);
+    }
+
+    // Fisher/Angler profession: fish sell value bonus
+    if (fishItem) {
+      const fishBonus = player.getProfessionBonus('fishSellValue');
+      if (fishBonus > 0) {
+        price = Math.floor(price * (1 + fishBonus));
+      }
+    }
 
     player.removeItem(data.itemId, quantity, quality);
     player.coins += price;
     player.addSkillXP(SKILLS.FARMING, 2 * quantity);
+    this._checkPendingProfession(socketId, player);
     this._sendInventoryUpdate(socketId, player);
   }
 
@@ -934,7 +954,22 @@ export class GameWorld {
         const fishItem = fishData[item.itemId];
         const basePrice = cropData?.sellPrice || fishItem?.value || 10;
         const multiplier = QUALITY_MULTIPLIER[item.quality] || 1;
-        totalCoins += Math.floor(basePrice * multiplier) * item.quantity;
+        let price = Math.floor(basePrice * multiplier) * item.quantity;
+
+        // Tiller profession: +10% crop sell value
+        if (cropData && player.hasProfession('tiller')) {
+          price = Math.floor(price * 1.1);
+        }
+
+        // Fisher/Angler profession: fish sell value bonus
+        if (fishItem) {
+          const fishBonus = player.getProfessionBonus('fishSellValue');
+          if (fishBonus > 0) {
+            price = Math.floor(price * (1 + fishBonus));
+          }
+        }
+
+        totalCoins += price;
       }
 
       if (totalCoins > 0) {
@@ -1102,6 +1137,7 @@ export class GameWorld {
 
     player.addItem(result.itemId, 1);
     player.addSkillXP(SKILLS.FARMING, 10);
+    this._checkPendingProfession(socketId, player);
 
     this._sendInventoryUpdate(socketId, player);
     this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
@@ -1119,9 +1155,17 @@ export class GameWorld {
     const spawn = foraging.collectAt(data.x, data.z);
     if (!spawn) return;
 
-    const quality = this._rollForageQuality(player.getSkillLevel(SKILLS.FORAGING));
-    player.addItem(spawn.itemId, 1, quality);
+    const quality = this._rollForageQuality(player.getSkillLevel(SKILLS.FORAGING), player);
+
+    // Gatherer profession: 20% chance double forage
+    let qty = 1;
+    if (player.hasProfession('gatherer') && Math.random() < 0.2) {
+      qty = 2;
+    }
+
+    player.addItem(spawn.itemId, qty, quality);
     player.addSkillXP(SKILLS.FORAGING, 7);
+    this._checkPendingProfession(socketId, player);
 
     this._sendInventoryUpdate(socketId, player);
     this._broadcastToMap(player.currentMap, ACTIONS.WORLD_UPDATE, {
@@ -1129,11 +1173,83 @@ export class GameWorld {
     });
   }
 
-  _rollForageQuality(foragingLevel) {
+  _rollForageQuality(foragingLevel, player = null) {
+    // Botanist profession: forage always gold quality
+    if (player && player.hasProfession('botanist')) return 2;
+
     const roll = Math.random();
     if (roll < foragingLevel * 0.01) return 2;
     if (roll < foragingLevel * 0.03) return 1;
     return 0;
+  }
+
+  // --- Professions ---
+
+  _getProfessionOptions(player, skill, level) {
+    const skillProfs = PROFESSIONS[skill];
+    if (!skillProfs) return [];
+
+    if (level === 5) {
+      return skillProfs[5] || [];
+    }
+
+    if (level === 10) {
+      // Find which level-5 profession was chosen
+      const chosen5 = (player.professions[skill] || [])[0];
+      if (!chosen5 || !skillProfs[10][chosen5]) return [];
+      return skillProfs[10][chosen5];
+    }
+
+    return [];
+  }
+
+  _checkPendingProfession(socketId, player) {
+    if (player._pendingProfession) {
+      const { skill, level } = player._pendingProfession;
+      const options = this._getProfessionOptions(player, skill, level);
+      if (options.length > 0) {
+        this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+          type: 'professionChoice', skill, level, options,
+        });
+      }
+      player._pendingProfession = null;
+    }
+  }
+
+  handleProfessionChoice(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player) return;
+
+    const { skill, professionId } = data;
+
+    // Validate the skill exists in PROFESSIONS
+    const skillProfs = PROFESSIONS[skill];
+    if (!skillProfs) return;
+
+    if (!player.professions[skill]) player.professions[skill] = [];
+
+    // Don't allow picking same level twice
+    const existingCount = player.professions[skill].length;
+    const skillLevel = player.getSkillLevel(skill);
+    if (existingCount >= 1 && skillLevel < 10) return;
+    if (existingCount >= 2) return;
+
+    // Validate that the professionId is actually a valid option
+    const level = existingCount === 0 ? 5 : 10;
+    const options = this._getProfessionOptions(player, skill, level);
+    if (!options.find(o => o.id === professionId)) return;
+
+    player.professions[skill].push(professionId);
+
+    // Save to database
+    const db = getDB();
+    db.prepare('UPDATE players SET professions = ? WHERE id = ?')
+      .run(JSON.stringify(player.professions), player.id);
+
+    this._sendInventoryUpdate(socketId, player);
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'professionChosen', skill, professionId,
+    });
   }
 
   // --- Helpers ---
@@ -1164,6 +1280,7 @@ export class GameWorld {
       energy: player.energy,
       maxEnergy: player.maxEnergy,
       skills: player.skills,
+      professions: player.professions,
       toolTiers: player.toolTiers,
     });
   }
@@ -1248,6 +1365,9 @@ export class GameWorld {
       for (const [name, data] of Object.entries(player.skills)) {
         stmt.run(player.id, name, data.level, data.xp);
       }
+      // Also persist professions
+      db.prepare('UPDATE players SET professions = ? WHERE id = ?')
+        .run(JSON.stringify(player.professions), player.id);
     });
     saveAll();
   }
