@@ -8,6 +8,7 @@ import * as THREE from 'three';
 export class AssetGenerator {
   constructor() {
     this._matCache = new Map();
+    this._geoCache = new Map();
   }
 
   getMaterial(color, options = {}) {
@@ -18,6 +19,24 @@ export class AssetGenerator {
       }));
     }
     return this._matCache.get(key);
+  }
+
+  getGeometry(type, ...args) {
+    const key = `${type}-${args.join(',')}`;
+    if (!this._geoCache.has(key)) {
+      let geo;
+      switch (type) {
+        case 'box': geo = new THREE.BoxGeometry(...args); break;
+        case 'sphere': geo = new THREE.SphereGeometry(...args); break;
+        case 'cylinder': geo = new THREE.CylinderGeometry(...args); break;
+        case 'cone': geo = new THREE.ConeGeometry(...args); break;
+        case 'dodecahedron': geo = new THREE.DodecahedronGeometry(...args); break;
+        case 'plane': geo = new THREE.PlaneGeometry(...args); break;
+        default: geo = new THREE.BoxGeometry(...args);
+      }
+      this._geoCache.set(key, geo);
+    }
+    return this._geoCache.get(key);
   }
 
   // Deterministic pseudo-random for consistent variation
@@ -651,9 +670,175 @@ export class AssetGenerator {
   }
 
   // ═══════════════════════════════════════════════
+  //  TOWN DECORATIONS — statue, fountain, lamppost, bench
+  // ═══════════════════════════════════════════════
+
+  createStatue() {
+    const group = new THREE.Group();
+
+    // Stone pedestal
+    const pedestal = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 0.4, 0.5),
+      this.getMaterial(0x999999)
+    );
+    pedestal.position.y = 0.2;
+    pedestal.castShadow = true;
+    group.add(pedestal);
+
+    // Body — simple figure
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.15, 0.6, 6),
+      this.getMaterial(0xaaaaaa)
+    );
+    body.position.y = 0.7;
+    body.castShadow = true;
+    group.add(body);
+
+    // Head
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(0.1, 6, 5),
+      this.getMaterial(0xaaaaaa)
+    );
+    head.position.y = 1.1;
+    group.add(head);
+
+    return group;
+  }
+
+  createFountain() {
+    const group = new THREE.Group();
+
+    // Base pool — wide short cylinder
+    const pool = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.8, 0.9, 0.2, 8),
+      this.getMaterial(0x888888)
+    );
+    pool.position.y = 0.1;
+    pool.castShadow = true;
+    group.add(pool);
+
+    // Water surface
+    const water = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.7, 0.7, 0.05, 8),
+      this.getMaterial(0x4a90d9, { transparent: true, opacity: 0.7 })
+    );
+    water.position.y = 0.15;
+    group.add(water);
+
+    // Central pillar
+    const pillar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.12, 0.6, 6),
+      this.getMaterial(0x999999)
+    );
+    pillar.position.y = 0.5;
+    pillar.castShadow = true;
+    group.add(pillar);
+
+    // Top bowl
+    const bowl = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.25, 0.15, 0.1, 6),
+      this.getMaterial(0x999999)
+    );
+    bowl.position.y = 0.8;
+    group.add(bowl);
+
+    return group;
+  }
+
+  createLamppost() {
+    const group = new THREE.Group();
+
+    // Pole
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.03, 0.04, 1.2, 4),
+      this.getMaterial(0x333333)
+    );
+    pole.position.y = 0.6;
+    pole.castShadow = true;
+    group.add(pole);
+
+    // Lamp housing
+    const lamp = new THREE.Mesh(
+      new THREE.BoxGeometry(0.15, 0.12, 0.15),
+      this.getMaterial(0xffee88, { emissive: 0xffcc44, emissiveIntensity: 0.5 })
+    );
+    lamp.position.y = 1.25;
+    group.add(lamp);
+
+    // Top cap
+    const cap = new THREE.Mesh(
+      new THREE.ConeGeometry(0.12, 0.08, 4),
+      this.getMaterial(0x333333)
+    );
+    cap.position.y = 1.35;
+    cap.rotation.y = Math.PI / 4;
+    group.add(cap);
+
+    return group;
+  }
+
+  createBench() {
+    const group = new THREE.Group();
+    const woodColor = 0x8b6b4a;
+
+    // Seat
+    const seat = new THREE.Mesh(
+      new THREE.BoxGeometry(0.8, 0.04, 0.3),
+      this.getMaterial(woodColor)
+    );
+    seat.position.y = 0.25;
+    seat.castShadow = true;
+    group.add(seat);
+
+    // Backrest
+    const back = new THREE.Mesh(
+      new THREE.BoxGeometry(0.8, 0.25, 0.03),
+      this.getMaterial(woodColor)
+    );
+    back.position.set(0, 0.38, -0.13);
+    group.add(back);
+
+    // Legs (4)
+    const legGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.25, 4);
+    const legMat = this.getMaterial(0x555555);
+    for (const [lx, lz] of [[-0.35, 0.1], [0.35, 0.1], [-0.35, -0.1], [0.35, -0.1]]) {
+      const leg = new THREE.Mesh(legGeo, legMat);
+      leg.position.set(lx, 0.125, lz);
+      group.add(leg);
+    }
+
+    return group;
+  }
+
+  createSignpost(seed = 0) {
+    const group = new THREE.Group();
+
+    // Post
+    const post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.03, 0.04, 0.8, 4),
+      this.getMaterial(0x8b6b4a)
+    );
+    post.position.y = 0.4;
+    post.castShadow = true;
+    group.add(post);
+
+    // Sign board
+    const sign = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 0.2, 0.03),
+      this.getMaterial(0xc4956a)
+    );
+    sign.position.y = 0.75;
+    group.add(sign);
+
+    return group;
+  }
+
+  // ═══════════════════════════════════════════════
 
   dispose() {
     for (const mat of this._matCache.values()) mat.dispose();
     this._matCache.clear();
+    for (const geo of this._geoCache.values()) geo.dispose();
+    this._geoCache.clear();
   }
 }
