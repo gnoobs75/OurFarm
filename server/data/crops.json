@@ -1,0 +1,10 @@
+{
+  "wheat": { "name": "Wheat", "buyPrice": 10, "sellPrice": 25, "growthTime": 4, "season": [0,1], "xp": 8 },
+  "corn": { "name": "Corn", "buyPrice": 15, "sellPrice": 35, "growthTime": 6, "season": [1], "xp": 12 },
+  "tomato": { "name": "Tomato", "buyPrice": 20, "sellPrice": 40, "growthTime": 5, "season": [1], "xp": 10 },
+  "carrot": { "name": "Carrot", "buyPrice": 8, "sellPrice": 20, "growthTime": 3, "season": [0], "xp": 6 },
+  "potato": { "name": "Potato", "buyPrice": 12, "sellPrice": 30, "growthTime": 5, "season": [0,2], "xp": 10 },
+  "strawberry": { "name": "Strawberry", "buyPrice": 30, "sellPrice": 60, "growthTime": 4, "season": [0], "xp": 14 },
+  "pumpkin": { "name": "Pumpkin", "buyPrice": 40, "sellPrice": 100, "growthTime": 8, "season": [2], "xp": 20 },
+  "blueberry": { "name": "Blueberry", "buyPrice": 25, "sellPrice": 50, "growthTime": 5, "season": [1], "xp": 12 }
+}

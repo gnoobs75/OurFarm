@@ -1,0 +1,10 @@
+{
+  "flour": { "name": "Flour", "building": "mill", "inputs": {"wheat": 3}, "output": "flour", "count": 1, "time": 2, "sellPrice": 50, "xp": 5 },
+  "bread": { "name": "Bread", "building": "kitchen", "inputs": {"flour": 1}, "output": "bread", "count": 1, "time": 3, "sellPrice": 80, "xp": 8 },
+  "cake": { "name": "Cake", "building": "kitchen", "inputs": {"flour": 2, "egg": 2, "strawberry": 3}, "output": "cake", "count": 1, "time": 5, "sellPrice": 250, "xp": 20 },
+  "cheese_wheel": { "name": "Cheese Wheel", "building": "kitchen", "inputs": {"milk": 3}, "output": "cheese_wheel", "count": 1, "time": 4, "sellPrice": 200, "xp": 15 },
+  "cloth": { "name": "Cloth", "building": "loom", "inputs": {"wool": 2}, "output": "cloth", "count": 1, "time": 3, "sellPrice": 120, "xp": 10 },
+  "copper_bar": { "name": "Copper Bar", "building": "forge", "inputs": {"copper_ore": 5}, "output": "copper_bar", "count": 1, "time": 3, "sellPrice": 60, "xp": 8 },
+  "iron_bar": { "name": "Iron Bar", "building": "forge", "inputs": {"iron_ore": 5}, "output": "iron_bar", "count": 1, "time": 4, "sellPrice": 100, "xp": 12 },
+  "gold_bar": { "name": "Gold Bar", "building": "forge", "inputs": {"gold_ore": 5}, "output": "gold_bar", "count": 1, "time": 5, "sellPrice": 200, "xp": 18 }
+}

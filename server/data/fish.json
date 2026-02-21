@@ -1,0 +1,17 @@
+{
+  "bass": { "name": "Bass", "rarity": 0, "value": 20, "location": "pond", "minLevel": 1 },
+  "trout": { "name": "Trout", "rarity": 0, "value": 25, "location": "river", "minLevel": 1 },
+  "catfish": { "name": "Catfish", "rarity": 0, "value": 30, "location": "pond", "minLevel": 2 },
+  "salmon": { "name": "Salmon", "rarity": 1, "value": 50, "location": "river", "minLevel": 3 },
+  "pike": { "name": "Pike", "rarity": 1, "value": 55, "location": "river", "minLevel": 4 },
+  "perch": { "name": "Perch", "rarity": 0, "value": 22, "location": "pond", "minLevel": 1 },
+  "carp": { "name": "Carp", "rarity": 0, "value": 18, "location": "pond", "minLevel": 1 },
+  "walleye": { "name": "Walleye", "rarity": 1, "value": 60, "location": "river", "minLevel": 5 },
+  "sturgeon": { "name": "Sturgeon", "rarity": 2, "value": 120, "location": "river", "minLevel": 7 },
+  "tuna": { "name": "Tuna", "rarity": 1, "value": 70, "location": "ocean", "minLevel": 8 },
+  "swordfish": { "name": "Swordfish", "rarity": 2, "value": 150, "location": "ocean", "minLevel": 10 },
+  "lobster": { "name": "Lobster", "rarity": 1, "value": 80, "location": "ocean", "minLevel": 6 },
+  "goldfish": { "name": "Goldfish", "rarity": 2, "value": 200, "location": "pond", "minLevel": 9 },
+  "anglerfish": { "name": "Anglerfish", "rarity": 3, "value": 500, "location": "ocean", "minLevel": 15 },
+  "legendCarp": { "name": "Legend Carp", "rarity": 3, "value": 1000, "location": "pond", "minLevel": 20 }
+}

@@ -1,0 +1,80 @@
+[
+  {
+    "id": "npc_baker", "name": "Rosie", "role": "Baker",
+    "personality": "cheerful",
+    "skinColor": "0xffcc99", "shirtColor": "0xff8866", "hairColor": "0xaa4400",
+    "homeX": 28, "homeZ": 8, "shopX": 30, "shopZ": 10,
+    "likedGifts": ["wheat", "strawberry", "egg"],
+    "dialogue": {
+      "intro": "Hi there! I'm Rosie. I run the bakery in town!",
+      "low": "Oh, hello. Can I help you with something?",
+      "mid": "Good to see you, friend! How's the farm?",
+      "high": "You're my favorite farmer! I saved you a fresh pastry!"
+    }
+  },
+  {
+    "id": "npc_smith", "name": "Grim", "role": "Blacksmith",
+    "personality": "grumpy",
+    "skinColor": "0xcc9966", "shirtColor": "0x555555", "hairColor": "0x222222",
+    "homeX": 35, "homeZ": 6, "shopX": 36, "shopZ": 8,
+    "likedGifts": ["copper_ore", "iron_ore", "gold_ore"],
+    "dialogue": {
+      "intro": "What do you want? I'm busy. Name's Grim.",
+      "low": "Back again? Make it quick.",
+      "mid": "Hmph. You're not so bad, I guess.",
+      "high": "...You're alright, kid. Here, take this — I made it for you."
+    }
+  },
+  {
+    "id": "npc_librarian", "name": "Willow", "role": "Librarian",
+    "personality": "shy",
+    "skinColor": "0xffe0cc", "shirtColor": "0x8866aa", "hairColor": "0x553388",
+    "homeX": 32, "homeZ": 5, "shopX": 33, "shopZ": 7,
+    "likedGifts": ["blueberry", "pumpkin"],
+    "dialogue": {
+      "intro": "Oh! I didn't see you there... I'm Willow.",
+      "low": "H-hi... Did you need a book?",
+      "mid": "I found a passage about ancient farming techniques. Want to hear?",
+      "high": "I... I look forward to seeing you every day."
+    }
+  },
+  {
+    "id": "npc_fisher", "name": "Old Pete", "role": "Fisherman",
+    "personality": "laid-back",
+    "skinColor": "0xddaa77", "shirtColor": "0x336699", "hairColor": "0xaaaaaa",
+    "homeX": 45, "homeZ": 32, "shopX": 48, "shopZ": 34,
+    "likedGifts": ["bass", "salmon", "sturgeon"],
+    "dialogue": {
+      "intro": "Well hey there! Name's Pete. Pull up a chair, the fish ain't bitin' anyway.",
+      "low": "Nice day for fishin', ain't it?",
+      "mid": "You know, you remind me of myself when I was young.",
+      "high": "Here, take my lucky rod. You've earned it, friend."
+    }
+  },
+  {
+    "id": "npc_mayor", "name": "Mayor Hart", "role": "Mayor",
+    "personality": "formal",
+    "skinColor": "0xffcc99", "shirtColor": "0x224466", "hairColor": "0x666666",
+    "homeX": 30, "homeZ": 4, "shopX": 32, "shopZ": 6,
+    "likedGifts": ["pumpkin", "gold_ore", "honey"],
+    "dialogue": {
+      "intro": "Welcome to our town! I'm Mayor Hart. We're glad to have a new farmer.",
+      "low": "Good day, citizen. Everything in order?",
+      "mid": "The town has really benefited from your contributions.",
+      "high": "You're an honorary citizen now. This town wouldn't be the same without you."
+    }
+  },
+  {
+    "id": "npc_vet", "name": "Dr. Fern", "role": "Veterinarian",
+    "personality": "caring",
+    "skinColor": "0xffe0cc", "shirtColor": "0x44aa66", "hairColor": "0x663300",
+    "homeX": 26, "homeZ": 7, "shopX": 27, "shopZ": 9,
+    "likedGifts": ["milk", "egg", "wool"],
+    "dialogue": {
+      "intro": "Hello! I'm Dr. Fern. I take care of all the animals around here.",
+      "low": "Remember to take good care of your animals!",
+      "mid": "Your animals seem really happy. You're doing great!",
+      "high": "You have such a gift with animals. I could learn from you!"
+    }
+  }
+]

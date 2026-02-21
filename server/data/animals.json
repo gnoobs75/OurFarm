@@ -1,0 +1,7 @@
+{
+  "chicken": { "name": "Chicken", "buyPrice": 200, "product": "egg", "productValue": 30, "productInterval": 24, "building": "coop" },
+  "cow": { "name": "Cow", "buyPrice": 500, "product": "milk", "productValue": 60, "productInterval": 48, "building": "barn" },
+  "sheep": { "name": "Sheep", "buyPrice": 400, "product": "wool", "productValue": 80, "productInterval": 72, "building": "barn" },
+  "goat": { "name": "Goat", "buyPrice": 450, "product": "cheese", "productValue": 70, "productInterval": 48, "building": "barn" },
+  "bee": { "name": "Bee Hive", "buyPrice": 300, "product": "honey", "productValue": 50, "productInterval": 96, "building": "none" }
+}

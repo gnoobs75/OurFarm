@@ -1,0 +1,8 @@
+{
+  "dog": { "name": "Dog", "buyPrice": 300, "bonus": "harvestSpeed", "bonusValue": 0.15, "rarity": "common" },
+  "cat": { "name": "Cat", "buyPrice": 300, "bonus": "pestProtection", "bonusValue": 0.2, "rarity": "common" },
+  "rabbit": { "name": "Rabbit", "buyPrice": 250, "bonus": "foragingLuck", "bonusValue": 0.1, "rarity": "common" },
+  "parrot": { "name": "Parrot", "buyPrice": 500, "bonus": "npcRelation", "bonusValue": 0.15, "rarity": "uncommon" },
+  "fox": { "name": "Fox", "buyPrice": 1000, "bonus": "animalProduct", "bonusValue": 0.2, "rarity": "rare" },
+  "owl": { "name": "Owl", "buyPrice": 1200, "bonus": "nightBonus", "bonusValue": 0.25, "rarity": "rare" }
+}

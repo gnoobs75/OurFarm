@@ -1,0 +1,10 @@
+[
+  { "id": "q_rosie_1", "npcId": "npc_baker", "type": "fetch", "description": "Rosie needs wheat for her bakery.", "targetItem": "wheat", "targetCount": 10, "rewardCoins": 150, "rewardXp": 30, "minHearts": 1 },
+  { "id": "q_rosie_2", "npcId": "npc_baker", "type": "fetch", "description": "Rosie wants strawberries for a special pie.", "targetItem": "strawberry", "targetCount": 5, "rewardCoins": 250, "rewardXp": 50, "minHearts": 3 },
+  { "id": "q_grim_1", "npcId": "npc_smith", "type": "fetch", "description": "Grim needs copper ore for a commission.", "targetItem": "copper_ore", "targetCount": 15, "rewardCoins": 200, "rewardXp": 40, "minHearts": 1 },
+  { "id": "q_grim_2", "npcId": "npc_smith", "type": "craft", "description": "Grim wants you to bring him an iron bar.", "targetItem": "iron_bar", "targetCount": 1, "rewardCoins": 300, "rewardXp": 60, "rewardItem": "steel_pickaxe", "minHearts": 4 },
+  { "id": "q_pete_1", "npcId": "npc_fisher", "type": "fetch", "description": "Old Pete wants to see a salmon.", "targetItem": "salmon", "targetCount": 1, "rewardCoins": 100, "rewardXp": 25, "minHearts": 1 },
+  { "id": "q_pete_2", "npcId": "npc_fisher", "type": "fetch", "description": "Pete heard rumors of a legendary carp...", "targetItem": "legendCarp", "targetCount": 1, "rewardCoins": 2000, "rewardXp": 200, "minHearts": 6 },
+  { "id": "q_fern_1", "npcId": "npc_vet", "type": "fetch", "description": "Dr. Fern needs milk for a sick animal.", "targetItem": "milk", "targetCount": 3, "rewardCoins": 120, "rewardXp": 20, "minHearts": 1 },
+  { "id": "q_mayor_1", "npcId": "npc_mayor", "type": "fetch", "description": "The Mayor wants pumpkins for the harvest festival.", "targetItem": "pumpkin", "targetCount": 5, "rewardCoins": 500, "rewardXp": 80, "minHearts": 2 }
+]
