@@ -1,6 +1,6 @@
 // server/game/TerrainGenerator.js
 // Generates the world tile grid from a seed using simplex noise.
-// Produces natural terrain zones: farm center, grassland, pond, path, stone edges.
+// Produces natural terrain zones: farm center, town area, grassland, pond, path, stone edges.
 
 import { createNoise2D } from 'simplex-noise';
 import { WORLD_SIZE, TILE_TYPES } from '../../shared/constants.js';
@@ -22,6 +22,22 @@ export class TerrainGenerator {
     const tiles = [];
     const S = WORLD_SIZE;
     const cx = S / 2, cz = S / 2;
+
+    // ── Town zone bounds (NE quadrant) ──
+    const townLeft = 24, townRight = 50;
+    const townTop = 2, townBottom = 16;
+
+    // Main east-west street at z ≈ 9
+    const mainStreetZ = 9;
+    const mainStreetHalfWidth = 1; // 3 tiles wide (8,9,10)
+
+    // North-south cross streets at regular intervals
+    const crossStreetXs = [28, 34, 40, 46];
+    const crossStreetHalfWidth = 0.5; // 2 tiles wide
+
+    // Central cobblestone plaza
+    const plazaLeft = 35, plazaRight = 39;
+    const plazaTop = 7, plazaBottom = 11;
 
     for (let z = 0; z < S; z++) {
       for (let x = 0; x < S; x++) {
@@ -47,9 +63,22 @@ export class TerrainGenerator {
         const isPond = pondDist < pondEdge;
         const isPondBeach = !isPond && pondDist < pondEdge + 0.3;
 
-        // Path: ~2 tile wide curving strip from farm center northward
+        // ── Town zone detection ──
+        const isTown = x >= townLeft && x <= townRight && z >= townTop && z <= townBottom;
+
+        // Town sub-zones
+        const isPlaza = x >= plazaLeft && x <= plazaRight && z >= plazaTop && z <= plazaBottom;
+        const isMainStreet = isTown && Math.abs(z - mainStreetZ) <= mainStreetHalfWidth;
+        const isCrossStreet = isTown && crossStreetXs.some(sx => Math.abs(x - sx) <= crossStreetHalfWidth);
+
+        // ── Farm-to-town connecting path ──
+        // Extends the existing path from the farm (cz-3 = 29) down to the town bottom (z=16)
+        // Curves gently using the same sine formula as the original path
         const pathX = cx + Math.sin(z * 0.15) * 2;
-        const isPath = Math.abs(x - pathX) < 1.5 && z < cz - 3;
+        const isConnectorPath = Math.abs(x - pathX) < 1.5 && z > townBottom && z < cz - 3;
+
+        // Original path: from farm center northward into the town connector
+        const isOriginalPath = Math.abs(x - pathX) < 1.5 && z < cz - 3;
 
         // Farm clearing: rectangular area near center
         const farmLeft = cx - 6, farmRight = cx + 6;
@@ -62,7 +91,17 @@ export class TerrainGenerator {
           type = TILE_TYPES.WATER;
         } else if (isPondBeach) {
           type = TILE_TYPES.SAND;
-        } else if (isPath) {
+        } else if (isPlaza) {
+          // Central town plaza — cobblestone
+          type = TILE_TYPES.STONE;
+        } else if (isMainStreet || isCrossStreet) {
+          // Town streets
+          type = TILE_TYPES.PATH;
+        } else if (isTown) {
+          // Open grass plots within the town for buildings
+          type = TILE_TYPES.GRASS;
+        } else if (isOriginalPath) {
+          // Path from farm northward (includes connector segment)
           type = TILE_TYPES.PATH;
         } else if (isFarmArea) {
           type = (Math.abs(height) < 0.15) ? TILE_TYPES.DIRT : TILE_TYPES.GRASS;
@@ -72,13 +111,13 @@ export class TerrainGenerator {
           type = height > 0.45 ? TILE_TYPES.STONE : TILE_TYPES.GRASS;
         }
 
-        // Height: gentle rolling for grass, flat for farm/path, low for water
+        // Height: gentle rolling for grass, flat for farm/path/town, low for water
         let tileHeight;
         if (type === TILE_TYPES.WATER) {
           tileHeight = -0.15;
         } else if (type === TILE_TYPES.SAND) {
           tileHeight = 0.02;
-        } else if (isFarmArea || isPath) {
+        } else if (isFarmArea || isOriginalPath || isTown) {
           tileHeight = 0;
         } else {
           tileHeight = Math.max(0, height * 0.12);
