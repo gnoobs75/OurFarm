@@ -33,7 +33,7 @@ export class TerrainGenerator {
 
     // North-south cross streets at regular intervals
     const crossStreetXs = [28, 34, 40, 46];
-    const crossStreetHalfWidth = 0.5; // 2 tiles wide
+    const crossStreetHalfWidth = 0.5; // 1 tile wide
 
     // Central cobblestone plaza
     const plazaLeft = 35, plazaRight = 39;
@@ -71,14 +71,9 @@ export class TerrainGenerator {
         const isMainStreet = isTown && Math.abs(z - mainStreetZ) <= mainStreetHalfWidth;
         const isCrossStreet = isTown && crossStreetXs.some(sx => Math.abs(x - sx) <= crossStreetHalfWidth);
 
-        // ── Farm-to-town connecting path ──
-        // Extends the existing path from the farm (cz-3 = 29) down to the town bottom (z=16)
-        // Curves gently using the same sine formula as the original path
+        // Path: curving strip from farm center northward through to town
         const pathX = cx + Math.sin(z * 0.15) * 2;
-        const isConnectorPath = Math.abs(x - pathX) < 1.5 && z > townBottom && z < cz - 3;
-
-        // Original path: from farm center northward into the town connector
-        const isOriginalPath = Math.abs(x - pathX) < 1.5 && z < cz - 3;
+        const isPath = Math.abs(x - pathX) < 1.5 && z > townBottom && z < cz - 3;
 
         // Farm clearing: rectangular area near center
         const farmLeft = cx - 6, farmRight = cx + 6;
@@ -100,7 +95,7 @@ export class TerrainGenerator {
         } else if (isTown) {
           // Open grass plots within the town for buildings
           type = TILE_TYPES.GRASS;
-        } else if (isOriginalPath) {
+        } else if (isPath) {
           // Path from farm northward (includes connector segment)
           type = TILE_TYPES.PATH;
         } else if (isFarmArea) {
@@ -117,7 +112,7 @@ export class TerrainGenerator {
           tileHeight = -0.15;
         } else if (type === TILE_TYPES.SAND) {
           tileHeight = 0.02;
-        } else if (isFarmArea || isOriginalPath || isTown) {
+        } else if (isFarmArea || isPath || isTown) {
           tileHeight = 0;
         } else {
           tileHeight = Math.max(0, height * 0.12);
