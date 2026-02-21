@@ -4,10 +4,10 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "dev:client": "vite client --open",
+    "dev:client": "vite --open",
     "dev:server": "node --watch server/index.js",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "build": "vite build client"
+    "build": "vite build"
   },
   "dependencies": {
     "@tweenjs/tween.js": "^25.0.0",
