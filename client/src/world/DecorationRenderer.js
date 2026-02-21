@@ -12,7 +12,7 @@ export class DecorationRenderer {
   }
 
   /** Build all decoration meshes from server data */
-  build(decorations) {
+  build(decorations, season = 0) {
     for (const dec of decorations) {
       let mesh;
       const worldX = dec.x * TILE_SIZE + TILE_SIZE / 2;
@@ -21,7 +21,7 @@ export class DecorationRenderer {
 
       switch (dec.type) {
         case 'tree':
-          mesh = this.assetGen.createTree(dec.variant, seed);
+          mesh = this.assetGen.createTree(dec.variant, seed, season);
           mesh.userData.type = 'tree';
           break;
         case 'rock':
@@ -48,6 +48,12 @@ export class DecorationRenderer {
       this.scene.add(mesh);
       this.meshes.push(mesh);
     }
+  }
+
+  /** Rebuild all decorations for a new season */
+  rebuild(decorations, season) {
+    this.dispose();
+    this.build(decorations, season);
   }
 
   /** Per-frame update — subtle tree sway */

@@ -30,7 +30,7 @@ export class AssetGenerator {
   //  TREES — 3 variants: oak, pine, fruit
   // ═══════════════════════════════════════════════
 
-  createTree(variant = 0, seed = 0) {
+  createTree(variant = 0, seed = 0, season = 0) {
     const group = new THREE.Group();
     const r = this._seededRand(seed, variant);
     const trunkH = 0.6 + r * 0.5;
@@ -46,8 +46,10 @@ export class AssetGenerator {
     group.add(trunk);
 
     if (variant % 3 === 1) {
-      // ── Pine: 3 stacked dark cones ──
-      const pineColors = [0x1a5c2a, 0x1e6b30, 0x227a38];
+      // ── Pine: evergreen, only slightly changes in winter ──
+      const pineColors = season === 3
+        ? [0x2a5533, 0x2e5e38, 0x326840]
+        : [0x1a5c2a, 0x1e6b30, 0x227a38];
       for (let i = 0; i < 3; i++) {
         const cone = new THREE.Mesh(
           new THREE.ConeGeometry(0.55 - i * 0.12, 0.5 + i * 0.05, 6),
@@ -58,9 +60,36 @@ export class AssetGenerator {
         group.add(cone);
       }
     } else {
-      // ── Oak / Fruit tree: overlapping sphere clusters ──
+      // ── Oak / Fruit tree: season-dependent foliage ──
       const isOak = variant % 3 === 0;
-      const leafColor = isOak ? 0x2d8a4e : 0x3da85a;
+      let leafColor;
+
+      if (season === 0) {         // Spring — bright fresh green
+        leafColor = isOak ? 0x3da85a : 0x4dbb6a;
+      } else if (season === 1) {  // Summer — deeper green
+        leafColor = isOak ? 0x2d8a4e : 0x3da85a;
+      } else if (season === 2) {  // Fall — orange/red/gold
+        const fallColors = [0xdd6622, 0xcc4411, 0xddaa22, 0xbb3300, 0xeeaa44];
+        leafColor = fallColors[Math.floor(this._seededRand(seed, 99) * fallColors.length)];
+      } else {                    // Winter — bare branches, no foliage
+        for (let i = 0; i < 3; i++) {
+          const cr = this._seededRand(seed + i, variant + i);
+          const branch = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.02, 0.01, 0.3, 3),
+            this.getMaterial(0x5a3a2a)
+          );
+          branch.position.set(
+            (cr - 0.5) * 0.3,
+            trunkH + 0.1 + i * 0.15,
+            (this._seededRand(seed + i + 5, variant) - 0.5) * 0.3
+          );
+          branch.rotation.set(cr * 0.5, cr * 2, (cr - 0.5) * 0.8);
+          group.add(branch);
+        }
+        group.userData.type = 'tree';
+        return group;
+      }
+
       const clusterCount = 2 + Math.floor(r * 2);
 
       for (let i = 0; i < clusterCount; i++) {
@@ -79,7 +108,7 @@ export class AssetGenerator {
         group.add(sphere);
       }
 
-      // Fruit tree gets small colored dots
+      // Fruit tree gets small colored dots (spring/summer/fall only)
       if (!isOak) {
         const fruitColors = [0xe74c3c, 0xff6b35, 0xf5d142];
         for (let i = 0; i < 5; i++) {
@@ -286,14 +315,28 @@ export class AssetGenerator {
 
   createCrop(cropType, stage) {
     const colors = {
-      wheat: 0xdaa520, corn: 0xf5d142, tomato: 0xe74c3c, carrot: 0xff8c00,
-      potato: 0x8b7355, strawberry: 0xff3366, pumpkin: 0xff7518, blueberry: 0x4169e1,
+      // Spring
+      parsnip: 0xf5e6c8, cauliflower: 0xf0f0f0, potato: 0x8b7355,
+      garlic: 0xf5f5dc, kale: 0x2d6b4a, rhubarb: 0xcc3355,
+      strawberry: 0xff3366, coffee_bean: 0x6b3a2a,
+      // Summer
+      melon: 0x66cc66, tomato: 0xe74c3c, hot_pepper: 0xff4422,
+      blueberry: 0x4169e1, corn: 0xf5d142, wheat: 0xdaa520,
+      radish: 0xee4466, starfruit: 0xffdd00,
+      // Fall
+      pumpkin: 0xff7518, yam: 0xcc6633, eggplant: 0x6633aa,
+      cranberry: 0xcc2244, grape: 0x6644aa, artichoke: 0x558844,
+      bok_choy: 0x44aa44, sunflower: 0xffcc00,
+      // Multi-season
+      carrot: 0xff8c00, ancient_fruit: 0x8844cc,
     };
 
-    // Corn gets special tall treatment
-    if (cropType === 'corn') {
-      return this._createCorn(stage);
-    }
+    // Special crop models
+    if (cropType === 'corn') return this._createCorn(stage);
+    if (cropType === 'pumpkin') return this._createPumpkin(stage);
+    if (cropType === 'melon') return this._createMelon(stage);
+    if (cropType === 'sunflower') return this._createSunflower(stage);
+    if (cropType === 'cauliflower') return this._createCauliflower(stage);
 
     const group = new THREE.Group();
     const scale = 0.2 + stage * 0.27;
@@ -382,6 +425,182 @@ export class AssetGenerator {
       );
       silk.position.set(0.04, stalkH * 0.7 + 0.06, 0);
       group.add(silk);
+    }
+
+    group.castShadow = true;
+    return group;
+  }
+
+  _createPumpkin(stage) {
+    const group = new THREE.Group();
+    const scale = 0.15 + stage * 0.2;
+
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.02, scale * 0.5, 4),
+      this.getMaterial(0x2d5a1e)
+    );
+    stem.position.y = scale * 0.25;
+    group.add(stem);
+
+    if (stage >= 2) {
+      for (let i = 0; i < 3; i++) {
+        const leaf = new THREE.Mesh(
+          new THREE.SphereGeometry(0.08, 5, 3),
+          this.getMaterial(0x3d8a30)
+        );
+        leaf.position.set(Math.cos(i * 2.1) * 0.15, 0.1, Math.sin(i * 2.1) * 0.15);
+        leaf.scale.y = 0.4;
+        group.add(leaf);
+      }
+    }
+
+    if (stage >= 3) {
+      const pumpkin = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 7, 5),
+        this.getMaterial(0xff7518)
+      );
+      pumpkin.position.y = 0.12;
+      pumpkin.scale.y = 0.75;
+      group.add(pumpkin);
+
+      const nub = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.03, 0.06, 4),
+        this.getMaterial(0x3d5a1e)
+      );
+      nub.position.y = 0.22;
+      group.add(nub);
+    }
+
+    group.castShadow = true;
+    return group;
+  }
+
+  _createMelon(stage) {
+    const group = new THREE.Group();
+    const scale = 0.15 + stage * 0.2;
+
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.02, scale * 0.5, 4),
+      this.getMaterial(0x2d5a1e)
+    );
+    stem.position.y = scale * 0.25;
+    group.add(stem);
+
+    if (stage >= 2) {
+      const leaf = new THREE.Mesh(
+        new THREE.SphereGeometry(0.1, 5, 3), this.getMaterial(0x3d9930)
+      );
+      leaf.position.y = scale * 0.4;
+      leaf.scale.y = 0.5;
+      group.add(leaf);
+    }
+
+    if (stage >= 3) {
+      const melon = new THREE.Mesh(
+        new THREE.SphereGeometry(0.16, 7, 5), this.getMaterial(0x66cc66)
+      );
+      melon.position.y = 0.1;
+      melon.scale.set(1.2, 0.8, 1);
+      group.add(melon);
+
+      const stripe = new THREE.Mesh(
+        new THREE.SphereGeometry(0.165, 7, 5), this.getMaterial(0x449944, { transparent: true, opacity: 0.3 })
+      );
+      stripe.position.y = 0.1;
+      stripe.scale.set(0.4, 0.82, 1.02);
+      group.add(stripe);
+    }
+
+    group.castShadow = true;
+    return group;
+  }
+
+  _createSunflower(stage) {
+    const group = new THREE.Group();
+    const stalkH = 0.15 + stage * 0.25;
+
+    const stalk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.025, stalkH, 4),
+      this.getMaterial(0x2d6a1e)
+    );
+    stalk.position.y = stalkH / 2;
+    group.add(stalk);
+
+    if (stage >= 2) {
+      for (let i = 0; i < 4; i++) {
+        const leaf = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.18, 0.06),
+          this.getMaterial(0x3d8a30, { side: THREE.DoubleSide })
+        );
+        leaf.position.set(0, stalkH * 0.3 + i * stalkH * 0.15, 0);
+        leaf.rotation.set(0.3, i * 1.57, (i % 2 ? 0.4 : -0.4));
+        group.add(leaf);
+      }
+    }
+
+    if (stage >= 3) {
+      const center = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.1, 0.1, 0.04, 8),
+        this.getMaterial(0x553311)
+      );
+      center.position.y = stalkH;
+      center.rotation.x = 0.3;
+      group.add(center);
+
+      for (let i = 0; i < 10; i++) {
+        const petal = new THREE.Mesh(
+          new THREE.SphereGeometry(0.04, 4, 3),
+          this.getMaterial(0xffcc00)
+        );
+        const a = (i / 10) * Math.PI * 2;
+        petal.position.set(
+          Math.cos(a) * 0.12,
+          stalkH + Math.sin(a) * 0.03,
+          Math.sin(a) * 0.12
+        );
+        group.add(petal);
+      }
+    }
+
+    group.castShadow = true;
+    return group;
+  }
+
+  _createCauliflower(stage) {
+    const group = new THREE.Group();
+    const scale = 0.2 + stage * 0.2;
+
+    const stem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.03, scale * 0.4, 4),
+      this.getMaterial(0x2d5a1e)
+    );
+    stem.position.y = scale * 0.2;
+    group.add(stem);
+
+    if (stage >= 1) {
+      for (let i = 0; i < 4; i++) {
+        const leaf = new THREE.Mesh(
+          new THREE.SphereGeometry(0.1, 5, 3),
+          this.getMaterial(0x3d9930)
+        );
+        const a = (i / 4) * Math.PI * 2;
+        leaf.position.set(Math.cos(a) * 0.08, scale * 0.2, Math.sin(a) * 0.08);
+        leaf.scale.y = 0.4;
+        group.add(leaf);
+      }
+    }
+
+    if (stage >= 3) {
+      for (let i = 0; i < 5; i++) {
+        const bump = new THREE.Mesh(
+          new THREE.SphereGeometry(0.05 + Math.random() * 0.03, 5, 4),
+          this.getMaterial(0xf0f0f0)
+        );
+        const a = (i / 5) * Math.PI * 2;
+        const r = i === 0 ? 0 : 0.04;
+        bump.position.set(Math.cos(a) * r, scale * 0.35 + 0.02, Math.sin(a) * r);
+        group.add(bump);
+      }
     }
 
     group.castShadow = true;

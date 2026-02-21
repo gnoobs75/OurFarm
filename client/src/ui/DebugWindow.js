@@ -41,7 +41,7 @@ export class DebugWindow {
         <div class="debug-row"><span>FPS:</span><span id="dbg-fps">--</span></div>
         <div class="debug-row"><span>Frame:</span><span id="dbg-frametime">--</span></div>
         <div class="debug-row"><span>Min/Max:</span><span id="dbg-minmax">--</span></div>
-        <canvas id="dbg-fps-graph" width="160" height="40"></canvas>
+        <canvas id="dbg-fps-graph" width="276" height="50"></canvas>
       </div>
       <div class="debug-section">
         <div class="debug-label">Renderer</div>

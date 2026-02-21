@@ -22,6 +22,7 @@ import { DialogueUI } from './ui/DialogueUI.js';
 import { DebugWindow } from './ui/DebugWindow.js';
 import { ShopUI } from './ui/ShopUI.js';
 import { FishingEffects } from './effects/FishingEffects.js';
+import { ParticleEffects } from './effects/ParticleEffects.js';
 import { tileToWorld } from '@shared/TileMap.js';
 import { TILE_TYPES } from '@shared/constants.js';
 import { debugClient } from './utils/DebugClient.js';
@@ -55,6 +56,7 @@ async function main() {
   shopUI.onBuy = (itemId, qty) => network.sendBuy(itemId, qty);
   shopUI.onSell = (itemId, qty) => network.sendSell(itemId, qty);
   const fishingFx = new FishingEffects(sceneManager.scene);
+  const particleFx = new ParticleEffects(sceneManager.scene);
 
   // --- Network ---
   const network = new NetworkClient();
@@ -84,7 +86,9 @@ async function main() {
     pets.build(state.pets);
     animals.build(state.animals);
     buildings.build(state.buildings);
-    decorations.build(state.decorations || []);
+    let currentDecorations = state.decorations || [];
+    let currentSeason = state.time.season;
+    decorations.build(currentDecorations, currentSeason);
 
     // Add players
     for (const p of state.players) {
@@ -99,6 +103,7 @@ async function main() {
     }
     hud.updateTime(state.time);
     hud.updateWeather(state.weather.weather);
+    sceneManager.updateTimeOfDay(state.time.hour);
 
     // Center camera on player
     if (localPlayer) {
@@ -178,17 +183,32 @@ async function main() {
           break;
         case 'tileChange':
           terrain.updateTile(data.x, data.z, data.tileType);
+          if (data.tileType === 6) { // TILLED
+            const { x: wx, z: wz } = tileToWorld(data.x, data.z);
+            particleFx.tillDust(wx, wz);
+          }
           break;
         case 'cropPlanted':
           crops.addCrop(data.crop);
+          particleFx.plantLeaves(
+            data.crop.tileX + 0.5,
+            data.crop.tileZ + 0.5
+          );
           break;
         case 'cropWatered':
-          // Visual feedback could be added here
+          if (data.x !== undefined && data.z !== undefined) {
+            const { x: wwx, z: wwz } = tileToWorld(data.x, data.z);
+            particleFx.waterDrops(wwx, wwz);
+          }
           break;
         case 'cropUpdate':
           crops.updateCrop(data.crop);
           break;
         case 'cropHarvested':
+          if (data.x !== undefined && data.z !== undefined) {
+            const { x: hx, z: hz } = tileToWorld(data.x, data.z);
+            particleFx.harvestBurst(hx, hz);
+          }
           crops.removeCrop(data.cropId);
           break;
         case 'fishCast':
@@ -235,7 +255,15 @@ async function main() {
       }
     });
 
-    network.on('timeUpdate', (data) => hud.updateTime(data));
+    network.on('timeUpdate', (data) => {
+      hud.updateTime(data);
+      sceneManager.updateTimeOfDay(data.hour);
+      if (data.season !== undefined && data.season !== currentSeason) {
+        currentSeason = data.season;
+        decorations.rebuild(currentDecorations, currentSeason);
+        terrain.build(state.tiles, currentSeason);
+      }
+    });
     network.on('weatherUpdate', (data) => {
       hud.updateWeather(data.weather);
       weather.setWeather(data.weather);
@@ -264,6 +292,7 @@ async function main() {
       pets.update(delta);
       animals.update(delta);
       fishingFx.update(delta);
+      particleFx.update(delta);
 
       // Debug window
       debugWindow.update(delta);
