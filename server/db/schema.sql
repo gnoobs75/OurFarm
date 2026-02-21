@@ -24,11 +24,21 @@ CREATE TABLE IF NOT EXISTS players (
   FOREIGN KEY (world_id) REFERENCES worlds(id)
 );
 
+CREATE TABLE IF NOT EXISTS player_skills (
+  player_id TEXT NOT NULL,
+  skill TEXT NOT NULL CHECK(skill IN ('farming','fishing','mining','foraging','combat')),
+  level INTEGER DEFAULT 0,
+  xp INTEGER DEFAULT 0,
+  PRIMARY KEY (player_id, skill),
+  FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS inventory (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   player_id TEXT NOT NULL,
   item_id TEXT NOT NULL,
   quantity INTEGER DEFAULT 1,
+  quality INTEGER DEFAULT 0,
   slot INTEGER,
   FOREIGN KEY (player_id) REFERENCES players(id)
 );

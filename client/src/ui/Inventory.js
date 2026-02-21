@@ -25,7 +25,11 @@ export class InventoryUI {
 
     for (const item of this.items) {
       const slot = document.createElement('div');
-      slot.className = 'inventory-slot';
+      let className = 'inventory-slot';
+      if (item.quality === 1) className += ' quality-silver';
+      else if (item.quality === 2) className += ' quality-gold';
+      else if (item.quality === 3) className += ' quality-iridium';
+      slot.className = className;
       slot.innerHTML = `<span style="font-size:11px">${item.itemId}</span><span class="count">${item.quantity}</span>`;
       slot.addEventListener('click', () => {
         if (this.onItemSelect) this.onItemSelect(item);

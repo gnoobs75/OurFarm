@@ -82,10 +82,42 @@ export const ACTIONS = {
   CRAFT_COLLECT: 'craft:collect',
   SHOP_BUY: 'shop:buy',
   SHOP_SELL: 'shop:sell',
+  SHIP_ITEM: 'ship:item',
   WORLD_STATE: 'world:state',
   WORLD_UPDATE: 'world:update',
   TIME_UPDATE: 'time:update',
   WEATHER_UPDATE: 'weather:update',
   INVENTORY_UPDATE: 'inventory:update',
   CHAT_MESSAGE: 'chat:message',
+};
+
+// Skills
+export const SKILLS = {
+  FARMING: 'farming',
+  FISHING: 'fishing',
+  MINING: 'mining',
+  FORAGING: 'foraging',
+  COMBAT: 'combat',
+};
+
+export const SKILL_MAX_LEVEL = 10;
+
+// XP needed for each level: level * 100
+export function xpForSkillLevel(level) {
+  return level * 100;
+}
+
+// Crop quality tiers
+export const QUALITY = {
+  NORMAL: 0,
+  SILVER: 1,
+  GOLD: 2,
+  IRIDIUM: 3,
+};
+
+export const QUALITY_MULTIPLIER = {
+  0: 1.0,
+  1: 1.25,
+  2: 1.5,
+  3: 2.0,
 };

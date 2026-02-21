@@ -172,6 +172,9 @@ async function main() {
         case 'cropWatered':
           // Visual feedback could be added here
           break;
+        case 'cropUpdate':
+          crops.updateCrop(data.crop);
+          break;
         case 'cropHarvested':
           crops.removeCrop(data.cropId);
           break;
@@ -187,6 +190,10 @@ async function main() {
         case 'fullSync':
           crops.dispose();
           crops.build(data.crops);
+          break;
+        case 'playerCollapse':
+          console.log(`You collapsed! Lost ${data.penalty} coins.`);
+          // Could show a UI notification in the future
           break;
       }
     });

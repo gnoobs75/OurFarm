@@ -3,7 +3,7 @@
 // processes player actions, and broadcasts updates.
 
 import { v4 as uuid } from 'uuid';
-import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE } from '../../shared/constants.js';
+import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES } from '../../shared/constants.js';
 import { isValidTile, tileIndex } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { DecorationGenerator } from './DecorationGenerator.js';
@@ -54,6 +54,7 @@ export class GameWorld {
     this.pets = new Map();       // id -> Pet
     this.npcs = npcsData.map(d => new NPC(d));
     this.buildings = new Map();
+    this.shippingBins = new Map(); // playerId -> [{itemId, quantity, quality}]
 
     // Set up starter farm (buildings + crops) on first run
     this._initStarterFarm();
@@ -87,10 +88,10 @@ export class GameWorld {
       }
     }
 
-    // Plant starter corn at various growth stages
+    // Plant starter parsnip at various growth stages
     for (let px = cx + 2; px <= cx + 5; px++) {
       for (let pz = cz - 1; pz <= cz + 1; pz++) {
-        const crop = new Crop({ tileX: px, tileZ: pz, cropType: 'corn' });
+        const crop = new Crop({ tileX: px, tileZ: pz, cropType: 'parsnip' });
         crop.stage = 1 + ((px + pz) % 3); // stages 1, 2, 3
         this.crops.set(crop.id, crop);
       }
@@ -140,6 +141,9 @@ export class GameWorld {
     // Advance time
     const timeEvents = this.time.tick(deltaSec);
 
+    // Check for 2 AM collapse
+    this._checkCollapse();
+
     // Calculate game hours elapsed this tick
     const gameHoursElapsed = (deltaSec * TIME_SCALE) / 3600;
 
@@ -172,7 +176,40 @@ export class GameWorld {
     }
   }
 
+  _checkCollapse() {
+    const hour = this.time.hour;
+    // 2 AM check — only trigger once when crossing the threshold
+    if (hour >= 2 && hour < 6) {
+      for (const player of this.players.values()) {
+        if (!player._collapsed) {
+          player._collapsed = true;
+          // Penalty: lose 10% coins (max 1000)
+          const penalty = Math.min(Math.floor(player.coins * 0.1), 1000);
+          player.coins -= penalty;
+          // Wake with 50% energy
+          player.energy = Math.floor(player.maxEnergy * 0.5);
+          this._sendInventoryUpdate(player.socketId, player);
+          // Broadcast collapse event to the specific player
+          if (this.io && player.socketId) {
+            this.io.to(player.socketId).emit(ACTIONS.WORLD_UPDATE, {
+              type: 'playerCollapse',
+              penalty,
+            });
+          }
+        }
+      }
+    }
+  }
+
   _onNewDay() {
+    // Reset collapse flag for all players
+    for (const player of this.players.values()) {
+      player._collapsed = false;
+    }
+
+    // Process shipping bins — pay players for items shipped yesterday
+    this._processShippingBins();
+
     logger.info('WORLD', `New day: Season ${this.time.season}, Day ${this.time.day}`, {
       crops: this.crops.size, animals: this.animals.size, players: this.players.size,
     });
@@ -204,6 +241,11 @@ export class GameWorld {
       player.energy = player.maxEnergy;
     }
 
+    // Save skills for all online players
+    for (const player of this.players.values()) {
+      this._savePlayerSkills(player);
+    }
+
     // Save state
     this._saveWorldState();
 
@@ -213,12 +255,48 @@ export class GameWorld {
 
   _onNewSeason(season) {
     logger.info('WORLD', `New season: ${season}`);
+    this._onSeasonChange(season);
+  }
+
+  _onSeasonChange(newSeason) {
+    const toRemove = [];
+    for (const [id, crop] of this.crops) {
+      const cropData = cropsData[crop.cropType];
+      if (cropData && !cropData.season.includes(newSeason)) {
+        toRemove.push(id);
+      }
+    }
+    for (const id of toRemove) {
+      const crop = this.crops.get(id);
+      const idx = tileIndex(crop.tileX, crop.tileZ);
+      if (idx >= 0 && idx < this.tiles.length) {
+        this.tiles[idx].type = TILE_TYPES.TILLED;
+      }
+      this.crops.delete(id);
+    }
+    if (toRemove.length > 0) {
+      logger.info('WORLD', `Season change: ${toRemove.length} crops died`);
+      this._broadcastWorldUpdate();
+    }
   }
 
   // --- Player Actions ---
 
   handlePlayerJoin(socket, data) {
-    const player = new Player({ name: data.name });
+    // Load or create persistent player in database
+    const db = getDB();
+    const playerId = data.playerId || uuid();
+    let row = db.prepare('SELECT * FROM players WHERE id = ?').get(playerId);
+    if (!row) {
+      db.prepare('INSERT INTO players (id, world_id, name) VALUES (?, ?, ?)')
+        .run(playerId, this.worldId, data.name || 'Farmer');
+      row = { id: playerId, name: data.name || 'Farmer' };
+    }
+
+    // Load saved skills from database
+    const skills = this._loadPlayerSkills(playerId);
+
+    const player = new Player({ id: playerId, name: data.name || row.name, skills });
     player.socketId = socket.id;
     this.players.set(socket.id, player);
 
@@ -238,6 +316,10 @@ export class GameWorld {
   handlePlayerLeave(socketId) {
     const player = this.players.get(socketId);
     if (!player) return;
+
+    // Save skills before removing
+    this._savePlayerSkills(player);
+
     logger.info('GAME', `${player.name} left`, { playerId: player.id, online: this.players.size - 1 });
     this.players.delete(socketId);
     this.io.emit(ACTIONS.PLAYER_LEAVE, { playerId: player.id });
@@ -338,18 +420,28 @@ export class GameWorld {
         if (!cropData) continue;
 
         const yield_ = 1 + Math.floor(Math.random() * 2);
-        player.addItem(crop.cropType, yield_);
-        player.addXP(cropData.xp);
-        this.crops.delete(id);
-
-        // Reset tile to tilled
-        const idx = tileIndex(data.x, data.z);
-        this.tiles[idx].type = TILE_TYPES.TILLED;
+        const quality = this._rollCropQuality(player.getSkillLevel(SKILLS.FARMING));
+        player.addItem(crop.cropType, yield_, quality);
+        player.addSkillXP(SKILLS.FARMING, cropData.xp);
 
         logger.debug('FARM', `${player.name} harvested ${crop.cropType} x${yield_} at (${data.x},${data.z})`, {
-          xp: cropData.xp, totalXP: player.xp, level: player.level,
+          xp: cropData.xp, farmingXP: player.skills.farming.xp, level: player.level, regrows: !!cropData.regrows,
         });
-        this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'cropHarvested', cropId: id, x: data.x, z: data.z });
+
+        if (cropData.regrows) {
+          // Regrowable: reset to mature stage, will grow back to harvestable
+          crop.stage = CROP_STAGES.MATURE;
+          crop.growth = 0;
+          crop.watered = false;
+          this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'cropUpdate', crop: crop.getState() });
+        } else {
+          // Non-regrowable: remove crop, reset tile
+          this.crops.delete(id);
+          const idx = tileIndex(data.x, data.z);
+          this.tiles[idx].type = TILE_TYPES.TILLED;
+          this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'cropHarvested', cropId: id, x: data.x, z: data.z });
+        }
+
         this._sendInventoryUpdate(socketId, player);
         break;
       }
@@ -376,7 +468,7 @@ export class GameWorld {
 
     if (fish) {
       player.addItem(fish.id, 1);
-      player.addXP(5 + fish.rarity * 10);
+      player.addSkillXP(SKILLS.FISHING, 5 + fish.rarity * 10);
       logger.debug('FISH', `${player.name} caught ${fish.id} (rarity ${fish.rarity})`);
       this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'fishCaught', playerId: player.id, fish });
       this._sendInventoryUpdate(socketId, player);
@@ -448,25 +540,84 @@ export class GameWorld {
     const quantity = data.quantity || 1;
     if (!player.hasItem(data.itemId, quantity)) return;
 
-    // Look up sell price
     const cropData = cropsData[data.itemId];
-    const price = cropData ? cropData.sellPrice : 10; // Default fallback
+    let basePrice = cropData?.sellPrice || 10;
 
-    player.removeItem(data.itemId, quantity);
-    player.coins += price * quantity;
-    player.addXP(2 * quantity);
+    // Find the item slot to get quality
+    const slot = player.inventory.find(i => i.itemId === data.itemId);
+    const quality = slot?.quality || 0;
+    const price = Math.floor(basePrice * QUALITY_MULTIPLIER[quality]) * quantity;
+
+    player.removeItem(data.itemId, quantity, quality);
+    player.coins += price;
+    player.addSkillXP(SKILLS.FARMING, 2 * quantity);
     this._sendInventoryUpdate(socketId, player);
   }
 
+  // --- Shipping Bin ---
+
+  handleShipItem(player, itemId, quantity) {
+    // Find the specific slot to get quality
+    const slot = player.inventory.find(i => i.itemId === itemId && i.quantity >= quantity);
+    if (!slot) return null;
+
+    const quality = slot.quality || 0;
+    player.removeItem(itemId, quantity, quality);
+
+    if (!this.shippingBins.has(player.id)) this.shippingBins.set(player.id, []);
+    this.shippingBins.get(player.id).push({ itemId, quantity, quality });
+
+    this._sendInventoryUpdate(player.socketId, player);
+    return { itemId, quantity };
+  }
+
+  _processShippingBins() {
+    for (const [playerId, items] of this.shippingBins) {
+      // players Map is keyed by socketId, so find by persistent player id
+      let player = null;
+      for (const p of this.players.values()) {
+        if (p.id === playerId) { player = p; break; }
+      }
+      if (!player) continue;
+
+      let totalCoins = 0;
+      for (const item of items) {
+        const cropData = cropsData[item.itemId];
+        const fishItem = fishData[item.itemId];
+        const basePrice = cropData?.sellPrice || fishItem?.value || 10;
+        const multiplier = QUALITY_MULTIPLIER[item.quality] || 1;
+        totalCoins += Math.floor(basePrice * multiplier) * item.quantity;
+      }
+
+      if (totalCoins > 0) {
+        player.coins += totalCoins;
+        this._sendInventoryUpdate(player.socketId, player);
+        logger.info('SHIPPING', `Player ${player.name} earned ${totalCoins} coins from shipping bin`);
+      }
+    }
+    this.shippingBins.clear();
+  }
+
   // --- Helpers ---
+
+  _rollCropQuality(farmingLevel) {
+    const roll = Math.random();
+    const goldChance = farmingLevel * 0.015;     // 1.5% per level
+    const silverChance = farmingLevel * 0.03;     // 3% per level
+
+    if (roll < goldChance) return 2;              // Gold
+    if (roll < goldChance + silverChance) return 1; // Silver
+    return 0;                                      // Normal
+  }
 
   _sendInventoryUpdate(socketId, player) {
     this.io.to(socketId).emit(ACTIONS.INVENTORY_UPDATE, {
       inventory: player.inventory,
       coins: player.coins,
-      xp: player.xp,
       level: player.level,
       energy: player.energy,
+      maxEnergy: player.maxEnergy,
+      skills: player.skills,
     });
   }
 
@@ -491,6 +642,31 @@ export class GameWorld {
       time: this.time.getState(),
       weather: this.weather.getState(),
     };
+  }
+
+  // --- Skill Persistence ---
+
+  _loadPlayerSkills(playerId) {
+    const db = getDB();
+    const rows = db.prepare('SELECT skill, level, xp FROM player_skills WHERE player_id = ?').all(playerId);
+    const skills = {};
+    for (const row of rows) {
+      skills[row.skill] = { level: row.level, xp: row.xp };
+    }
+    return skills;
+  }
+
+  _savePlayerSkills(player) {
+    const db = getDB();
+    const stmt = db.prepare(
+      'INSERT OR REPLACE INTO player_skills (player_id, skill, level, xp) VALUES (?, ?, ?, ?)'
+    );
+    const saveAll = db.transaction(() => {
+      for (const [name, data] of Object.entries(player.skills)) {
+        stmt.run(player.id, name, data.level, data.xp);
+      }
+    });
+    saveAll();
   }
 
   _saveWorldState() {
