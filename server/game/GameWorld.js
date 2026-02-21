@@ -3,7 +3,7 @@
 // processes player actions, and broadcasts updates.
 
 import { v4 as uuid } from 'uuid';
-import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE } from '../../shared/constants.js';
+import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER } from '../../shared/constants.js';
 import { isValidTile, tileIndex } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { DecorationGenerator } from './DecorationGenerator.js';
@@ -360,8 +360,9 @@ export class GameWorld {
         if (!cropData) continue;
 
         const yield_ = 1 + Math.floor(Math.random() * 2);
-        player.addItem(crop.cropType, yield_);
-        player.addXP(cropData.xp);
+        const quality = this._rollCropQuality(player.getSkillLevel(SKILLS.FARMING));
+        player.addItem(crop.cropType, yield_, quality);
+        player.addSkillXP(SKILLS.FARMING, cropData.xp);
         this.crops.delete(id);
 
         // Reset tile to tilled
@@ -398,7 +399,7 @@ export class GameWorld {
 
     if (fish) {
       player.addItem(fish.id, 1);
-      player.addXP(5 + fish.rarity * 10);
+      player.addSkillXP(SKILLS.FISHING, 5 + fish.rarity * 10);
       logger.debug('FISH', `${player.name} caught ${fish.id} (rarity ${fish.rarity})`);
       this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'fishCaught', playerId: player.id, fish });
       this._sendInventoryUpdate(socketId, player);
@@ -470,17 +471,31 @@ export class GameWorld {
     const quantity = data.quantity || 1;
     if (!player.hasItem(data.itemId, quantity)) return;
 
-    // Look up sell price
     const cropData = cropsData[data.itemId];
-    const price = cropData ? cropData.sellPrice : 10; // Default fallback
+    let basePrice = cropData?.sellPrice || 10;
+
+    // Find the item slot to get quality
+    const slot = player.inventory.find(i => i.itemId === data.itemId);
+    const quality = slot?.quality || 0;
+    const price = Math.floor(basePrice * QUALITY_MULTIPLIER[quality]) * quantity;
 
     player.removeItem(data.itemId, quantity);
-    player.coins += price * quantity;
-    player.addXP(2 * quantity);
+    player.coins += price;
+    player.addSkillXP(SKILLS.FARMING, 2 * quantity);
     this._sendInventoryUpdate(socketId, player);
   }
 
   // --- Helpers ---
+
+  _rollCropQuality(farmingLevel) {
+    const roll = Math.random();
+    const goldChance = farmingLevel * 0.015;     // 1.5% per level
+    const silverChance = farmingLevel * 0.03;     // 3% per level
+
+    if (roll < goldChance) return 2;              // Gold
+    if (roll < goldChance + silverChance) return 1; // Silver
+    return 0;                                      // Normal
+  }
 
   _sendInventoryUpdate(socketId, player) {
     this.io.to(socketId).emit(ACTIONS.INVENTORY_UPDATE, {
