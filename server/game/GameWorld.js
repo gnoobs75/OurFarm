@@ -218,6 +218,29 @@ export class GameWorld {
 
   _onNewSeason(season) {
     logger.info('WORLD', `New season: ${season}`);
+    this._onSeasonChange(season);
+  }
+
+  _onSeasonChange(newSeason) {
+    const toRemove = [];
+    for (const [id, crop] of this.crops) {
+      const cropData = cropsData[crop.cropType];
+      if (cropData && !cropData.season.includes(newSeason)) {
+        toRemove.push(id);
+      }
+    }
+    for (const id of toRemove) {
+      const crop = this.crops.get(id);
+      const idx = tileIndex(crop.tileX, crop.tileZ);
+      if (idx >= 0 && idx < this.tiles.length) {
+        this.tiles[idx].type = TILE_TYPES.TILLED;
+      }
+      this.crops.delete(id);
+    }
+    if (toRemove.length > 0) {
+      logger.info('WORLD', `Season change: ${toRemove.length} crops died`);
+      this._broadcastWorldUpdate();
+    }
   }
 
   // --- Player Actions ---
