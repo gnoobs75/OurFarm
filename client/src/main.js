@@ -124,6 +124,14 @@ async function main() {
     input.on('tileMove', ({ tile, worldPos }) => {
       if (dialogueUI.visible) return;
 
+      // Check for animal interaction
+      const animalId = animals.getAnimalAtPosition(worldPos.x, worldPos.z);
+      if (animalId) {
+        network.sendAnimalCollect(animalId);
+        network.sendAnimalFeed(animalId);
+        return;
+      }
+
       // Check for NPC first
       const npcId = npcs.getNPCAtPosition(worldPos.x, worldPos.z);
       if (npcId) {
@@ -209,6 +217,13 @@ async function main() {
         case 'npcDialogue':
           dialogueUI._npcId = data.npcId;
           dialogueUI.show(data.npcName, data.text);
+          break;
+        case 'animalUpdate':
+          // Update the animal data stored in renderer
+          if (data.animal) {
+            const entry = animals.animalMeshes.get(data.animal.id);
+            if (entry) entry.data = data.animal;
+          }
           break;
         case 'fullSync':
           crops.dispose();

@@ -148,6 +148,10 @@ io.on('connection', (socket) => {
   wrap(ACTIONS.NPC_TALK, (data) => world.handleNPCTalk(socket.id, data));
   wrap(ACTIONS.NPC_GIFT, (data) => world.handleNPCGift(socket.id, data));
 
+  // Animal interaction
+  wrap(ACTIONS.ANIMAL_FEED, (data) => world.handleAnimalFeed(socket.id, data));
+  wrap(ACTIONS.ANIMAL_COLLECT, (data) => world.handleAnimalCollect(socket.id, data));
+
   // Shop
   wrap(ACTIONS.SHOP_BUY, (data) => world.handleShopBuy(socket.id, data));
   wrap(ACTIONS.SHOP_SELL, (data) => world.handleShopSell(socket.id, data));

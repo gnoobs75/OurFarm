@@ -23,6 +23,16 @@ export class AnimalRenderer {
     }
   }
 
+  getAnimalAtPosition(worldX, worldZ) {
+    const threshold = 0.8;
+    for (const [id, entry] of this.animalMeshes) {
+      const dx = entry.mesh.position.x - worldX;
+      const dz = entry.mesh.position.z - worldZ;
+      if (Math.sqrt(dx * dx + dz * dz) < threshold) return id;
+    }
+    return null;
+  }
+
   dispose() {
     for (const { mesh } of this.animalMeshes.values()) this.scene.remove(mesh);
     this.animalMeshes.clear();

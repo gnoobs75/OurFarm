@@ -139,9 +139,21 @@ export class GameWorld {
       }
     }
 
+    // Spawn starter animals
+    const starterAnimals = [
+      { type: 'chicken', x: 27, z: 35 },
+      { type: 'chicken', x: 28, z: 36 },
+      { type: 'cow', x: 26, z: 38 },
+    ];
+    for (const a of starterAnimals) {
+      const animal = new Animal(a);
+      farmMap.animals.set(animal.id, animal);
+    }
+
     logger.info('WORLD', 'Starter farm initialized', {
       farmBuildings: farmMap.buildings.size,
       farmCrops: farmMap.crops.size,
+      farmAnimals: farmMap.animals.size,
     });
   }
 
@@ -197,6 +209,12 @@ export class GameWorld {
     for (const crop of farmMap.crops.values()) {
       const data = cropsData[crop.cropType];
       if (data) crop.tick(gameHoursElapsed, data);
+    }
+
+    // Animal product timers
+    for (const animal of farmMap.animals.values()) {
+      const animalData = animalsData[animal.type];
+      if (animalData) animal.tickHour(animalData, gameHoursElapsed);
     }
 
     // Update NPC schedules on town map
@@ -622,6 +640,44 @@ export class GameWorld {
       type: 'npcDialogue', npcId: npc.id, npcName: npc.name, text: responseText, hearts: newHearts,
     });
     this._sendInventoryUpdate(socketId, player);
+  }
+
+  handleAnimalFeed(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const animal = farmMap.animals.get(data.animalId);
+    if (!animal) return;
+
+    animal.feed();
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'animalUpdate', animal: animal.getState(),
+    });
+  }
+
+  handleAnimalCollect(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const animal = farmMap.animals.get(data.animalId);
+    if (!animal || !animal.productReady) return;
+
+    const animalData = animalsData[animal.type];
+    if (!animalData) return;
+
+    const result = animal.collectProduct();
+    if (!result) return;
+
+    const quality = result.qualityBonus > 1 ? 1 : 0;
+    player.addItem(animalData.product, 1, quality);
+    player.addSkillXP(SKILLS.FARMING, 5);
+
+    this._sendInventoryUpdate(socketId, player);
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'animalUpdate', animal: animal.getState(),
+    });
   }
 
   handleShopBuy(socketId, data) {
