@@ -37,7 +37,7 @@ export class Player {
       { itemId: 'pickaxe', quantity: 1 },
       { itemId: 'axe', quantity: 1 },
       { itemId: 'fishing_rod', quantity: 1 },
-      { itemId: 'wheat_seed', quantity: 15 },
+      { itemId: 'parsnip_seed', quantity: 15 },
       { itemId: 'carrot_seed', quantity: 10 },
     ];
   }
@@ -54,8 +54,12 @@ export class Player {
     else this.inventory.push({ itemId, quantity, quality });
   }
 
-  removeItem(itemId, quantity = 1) {
-    const slot = this.inventory.find(i => i.itemId === itemId && i.quantity >= quantity);
+  removeItem(itemId, quantity = 1, quality = undefined) {
+    const slot = this.inventory.find(i =>
+      i.itemId === itemId &&
+      i.quantity >= quantity &&
+      (quality === undefined || (i.quality || 0) === quality)
+    );
     if (!slot) return false;
     slot.quantity -= quantity;
     if (slot.quantity <= 0) this.inventory = this.inventory.filter(i => i.quantity > 0);

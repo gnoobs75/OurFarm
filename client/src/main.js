@@ -172,6 +172,9 @@ async function main() {
         case 'cropWatered':
           // Visual feedback could be added here
           break;
+        case 'cropUpdate':
+          crops.updateCrop(data.crop);
+          break;
         case 'cropHarvested':
           crops.removeCrop(data.cropId);
           break;

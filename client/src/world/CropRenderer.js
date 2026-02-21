@@ -24,17 +24,15 @@ export class CropRenderer {
     this.cropMeshes.set(crop.id, { mesh, data: crop });
   }
 
-  updateCrop(cropId, newStage) {
-    const entry = this.cropMeshes.get(cropId);
-    if (!entry) return;
-    const oldMesh = entry.mesh;
-    this.scene.remove(oldMesh);
-    this._disposeGroup(oldMesh);
-    entry.data.stage = newStage;
-    const newMesh = this.assetGen.createCrop(entry.data.cropType, newStage);
-    newMesh.position.copy(oldMesh.position);
-    this.scene.add(newMesh);
-    entry.mesh = newMesh;
+  updateCrop(cropData) {
+    const existing = this.cropMeshes.get(cropData.id);
+    if (existing) {
+      // Remove old mesh and re-add with updated state
+      this.scene.remove(existing.mesh);
+      this._disposeGroup(existing.mesh);
+      this.cropMeshes.delete(cropData.id);
+    }
+    this.addCrop(cropData);
   }
 
   removeCrop(cropId) {

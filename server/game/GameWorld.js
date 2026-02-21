@@ -425,7 +425,7 @@ export class GameWorld {
         player.addSkillXP(SKILLS.FARMING, cropData.xp);
 
         logger.debug('FARM', `${player.name} harvested ${crop.cropType} x${yield_} at (${data.x},${data.z})`, {
-          xp: cropData.xp, totalXP: player.xp, level: player.level, regrows: !!cropData.regrows,
+          xp: cropData.xp, farmingXP: player.skills.farming.xp, level: player.level, regrows: !!cropData.regrows,
         });
 
         if (cropData.regrows) {
@@ -548,7 +548,7 @@ export class GameWorld {
     const quality = slot?.quality || 0;
     const price = Math.floor(basePrice * QUALITY_MULTIPLIER[quality]) * quantity;
 
-    player.removeItem(data.itemId, quantity);
+    player.removeItem(data.itemId, quantity, quality);
     player.coins += price;
     player.addSkillXP(SKILLS.FARMING, 2 * quantity);
     this._sendInventoryUpdate(socketId, player);
@@ -562,7 +562,7 @@ export class GameWorld {
     if (!slot) return null;
 
     const quality = slot.quality || 0;
-    player.removeItem(itemId, quantity);
+    player.removeItem(itemId, quantity, quality);
 
     if (!this.shippingBins.has(player.id)) this.shippingBins.set(player.id, []);
     this.shippingBins.get(player.id).push({ itemId, quantity, quality });
@@ -614,9 +614,10 @@ export class GameWorld {
     this.io.to(socketId).emit(ACTIONS.INVENTORY_UPDATE, {
       inventory: player.inventory,
       coins: player.coins,
-      xp: player.xp,
       level: player.level,
       energy: player.energy,
+      maxEnergy: player.maxEnergy,
+      skills: player.skills,
     });
   }
 
