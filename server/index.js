@@ -7,9 +7,11 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync, readdirSync, existsSync } from 'fs';
 import { ACTIONS } from '../shared/constants.js';
 import { GameWorld } from './game/GameWorld.js';
 import { closeDB } from './db/database.js';
+import { logger } from './utils/Logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -21,45 +23,133 @@ const io = new Server(httpServer, {
 
 const PORT = process.env.PORT || 3000;
 
+// Parse JSON bodies for debug endpoints
+app.use(express.json());
+
 // Serve static client files (production)
 app.use(express.static(join(__dirname, '../dist')));
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', players: world.players.size });
+  const uptime = process.uptime();
+  const mem = process.memoryUsage();
+  res.json({
+    status: 'ok',
+    players: world.players.size,
+    uptime: Math.floor(uptime),
+    memory: { heapUsed: Math.round(mem.heapUsed / 1024 / 1024) + 'MB', rss: Math.round(mem.rss / 1024 / 1024) + 'MB' },
+    time: world.time?.getState(),
+    debug: logger.isDebug,
+  });
+});
+
+// --- Debug API endpoints (active in both modes, detailed in debug) ---
+
+// Receive client-side errors
+app.post('/api/debug/client-error', (req, res) => {
+  logger.clientError(req.body);
+  res.json({ received: true });
+});
+
+// Get current game state snapshot
+app.get('/api/debug/state', (req, res) => {
+  res.json({
+    players: Array.from(world.players.values()).map(p => p.getState()),
+    crops: world.crops.size,
+    animals: world.animals.size,
+    pets: world.pets.size,
+    npcs: world.npcs.length,
+    time: world.time?.getState(),
+    weather: world.weather?.getState(),
+    tileCount: world.tiles?.length,
+  });
+});
+
+// List available log files
+app.get('/api/debug/logs', (req, res) => {
+  const paths = logger.getLogPaths();
+  if (!paths.debug) {
+    return res.json({ debug: false, message: 'Start with start-debug.bat for full logging' });
+  }
+  const logDir = paths.logDir;
+  let files = [];
+  if (existsSync(logDir)) {
+    files = readdirSync(logDir).map(f => ({
+      name: f,
+      path: join(logDir, f),
+    }));
+  }
+  res.json({ debug: true, sessionId: paths.sessionId, files, paths });
+});
+
+// Read a specific log file (tail N lines)
+app.get('/api/debug/logs/:filename', (req, res) => {
+  const paths = logger.getLogPaths();
+  if (!paths.debug) return res.status(404).json({ error: 'Debug mode not active' });
+
+  const filePath = join(paths.logDir, req.params.filename);
+  if (!existsSync(filePath)) return res.status(404).json({ error: 'Log file not found' });
+
+  const content = readFileSync(filePath, 'utf-8');
+  const lines = content.split('\n');
+  const tail = parseInt(req.query.tail) || 200;
+  const tailLines = lines.slice(-tail);
+
+  res.type('text/plain').send(tailLines.join('\n'));
 });
 
 // Create game world
+logger.info('SERVER', 'Initializing GameWorld...');
 const world = new GameWorld(io);
+logger.info('SERVER', 'GameWorld initialized', { tiles: world.tiles.length, npcs: world.npcs.length });
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
-  console.log('Socket connected:', socket.id);
+  logger.info('SOCKET', `Connected: ${socket.id}`, { transport: socket.conn.transport.name });
+
+  // Wrap each handler with error catching and action logging
+  const wrap = (name, handler) => {
+    socket.on(name, (data) => {
+      try {
+        handler(data);
+        logger.action(socket.id, name, data, 'ok');
+      } catch (err) {
+        logger.error('SOCKET', `Error in ${name}`, { error: err.message, stack: err.stack, data });
+      }
+    });
+  };
 
   // Player join
-  socket.on(ACTIONS.PLAYER_JOIN, (data) => world.handlePlayerJoin(socket, data));
+  wrap(ACTIONS.PLAYER_JOIN, (data) => world.handlePlayerJoin(socket, data));
 
-  // Player movement
-  socket.on(ACTIONS.PLAYER_MOVE, (data) => world.handlePlayerMove(socket.id, data));
+  // Player movement (high frequency — only log in debug)
+  socket.on(ACTIONS.PLAYER_MOVE, (data) => {
+    try {
+      world.handlePlayerMove(socket.id, data);
+    } catch (err) {
+      logger.error('SOCKET', 'Error in player:move', { error: err.message, data });
+    }
+  });
 
   // Farming actions
-  socket.on(ACTIONS.FARM_TILL, (data) => world.handleTill(socket.id, data));
-  socket.on(ACTIONS.FARM_PLANT, (data) => world.handlePlant(socket.id, data));
-  socket.on(ACTIONS.FARM_WATER, (data) => world.handleWater(socket.id, data));
-  socket.on(ACTIONS.FARM_HARVEST, (data) => world.handleHarvest(socket.id, data));
+  wrap(ACTIONS.FARM_TILL, (data) => world.handleTill(socket.id, data));
+  wrap(ACTIONS.FARM_PLANT, (data) => world.handlePlant(socket.id, data));
+  wrap(ACTIONS.FARM_WATER, (data) => world.handleWater(socket.id, data));
+  wrap(ACTIONS.FARM_HARVEST, (data) => world.handleHarvest(socket.id, data));
 
   // Fishing
-  socket.on(ACTIONS.FISH_CAST, (data) => world.handleFishCast(socket.id, data));
+  wrap(ACTIONS.FISH_CAST, (data) => world.handleFishCast(socket.id, data));
 
   // NPC interaction
-  socket.on(ACTIONS.NPC_TALK, (data) => world.handleNPCTalk(socket.id, data));
+  wrap(ACTIONS.NPC_TALK, (data) => world.handleNPCTalk(socket.id, data));
 
   // Shop
-  socket.on(ACTIONS.SHOP_BUY, (data) => world.handleShopBuy(socket.id, data));
-  socket.on(ACTIONS.SHOP_SELL, (data) => world.handleShopSell(socket.id, data));
+  wrap(ACTIONS.SHOP_BUY, (data) => world.handleShopBuy(socket.id, data));
+  wrap(ACTIONS.SHOP_SELL, (data) => world.handleShopSell(socket.id, data));
 
   // Disconnect
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
+    logger.info('SOCKET', `Disconnected: ${socket.id}`, { reason });
     world.handlePlayerLeave(socket.id);
   });
 });
@@ -67,12 +157,27 @@ io.on('connection', (socket) => {
 // Start server
 world.start();
 httpServer.listen(PORT, () => {
-  console.log(`OurFarm server running on http://localhost:${PORT}`);
+  logger.info('SERVER', `OurFarm running on http://localhost:${PORT}`, { debug: logger.isDebug });
+  if (logger.isDebug) {
+    const paths = logger.getLogPaths();
+    logger.info('SERVER', `Log files:`, {
+      server: paths.server,
+      actions: paths.actions,
+      client: paths.client,
+    });
+  }
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
-  console.log('Shutting down...');
+  logger.info('SERVER', 'Shutting down (SIGINT)...');
+  world.stop();
+  closeDB();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  logger.info('SERVER', 'Shutting down (SIGTERM)...');
   world.stop();
   closeDB();
   process.exit(0);

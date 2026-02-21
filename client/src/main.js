@@ -20,6 +20,7 @@ import { InventoryUI } from './ui/Inventory.js';
 import { DialogueUI } from './ui/DialogueUI.js';
 import { tileToWorld } from '@shared/TileMap.js';
 import { TILE_TYPES } from '@shared/constants.js';
+import { debugClient } from './utils/DebugClient.js';
 
 async function main() {
   // --- Engine Setup ---
@@ -52,6 +53,17 @@ async function main() {
 
   try {
     const state = await network.connect(playerName);
+
+    // Activate debug instrumentation
+    debugClient.init(state.playerId);
+    debugClient.log('INIT', 'Connected to server', {
+      playerId: state.playerId,
+      tiles: state.tiles.length,
+      crops: state.crops.length,
+      npcs: state.npcs.length,
+      players: state.players.length,
+      time: state.time,
+    });
 
     // --- Build world from server state ---
     terrain.build(state.tiles, state.time.season);
@@ -198,9 +210,11 @@ async function main() {
 
     sceneManager.start();
     console.log('OurFarm started!');
+    debugClient.log('INIT', 'Render loop started');
 
   } catch (err) {
     console.error('Failed to connect:', err);
+    debugClient.log('FATAL', 'Connection failed', { error: err.message, stack: err.stack });
     document.body.innerHTML = '<div style="color:white;padding:20px;font-family:sans-serif"><h2>Connection Failed</h2><p>Make sure the server is running on port 3000.</p><p>Run: <code>npm run dev:server</code></p></div>';
   }
 }

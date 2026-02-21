@@ -15,6 +15,7 @@ import { Pet } from '../entities/Pet.js';
 import { Animal } from '../entities/Animal.js';
 import { FishCalculator } from '../entities/Fish.js';
 import { getDB } from '../db/database.js';
+import { logger } from '../utils/Logger.js';
 
 // Load data files
 import { readFileSync } from 'fs';
@@ -62,21 +63,24 @@ export class GameWorld {
     if (!row) {
       const seed = Math.floor(Math.random() * 2147483647);
       db.prepare('INSERT INTO worlds (id, seed) VALUES (?, ?)').run(this.worldId, seed);
+      logger.info('WORLD', `New world created with seed ${seed}`);
       return seed;
     }
     // Restore time state
     this.time = new TimeManager({ season: row.season, day: row.day, hour: row.hour });
+    logger.info('WORLD', `Loaded existing world`, { seed: row.seed, season: row.season, day: row.day, hour: row.hour });
     return row.seed;
   }
 
   start() {
-    console.log('GameWorld started. Tick rate:', TICK_RATE);
+    logger.info('WORLD', `GameWorld started. Tick rate: ${TICK_RATE}`);
     this._tickInterval = setInterval(() => this._tick(), 1000 / TICK_RATE);
   }
 
   stop() {
     clearInterval(this._tickInterval);
     this._saveWorldState();
+    logger.info('WORLD', 'GameWorld stopped and state saved');
   }
 
   _tick() {
@@ -123,8 +127,13 @@ export class GameWorld {
   }
 
   _onNewDay() {
+    logger.info('WORLD', `New day: Season ${this.time.season}, Day ${this.time.day}`, {
+      crops: this.crops.size, animals: this.animals.size, players: this.players.size,
+    });
+
     // Weather change
     const newWeather = this.weather.onNewDay(this.time.season);
+    logger.debug('WORLD', `Weather changed to ${newWeather}`);
     this.io.emit(ACTIONS.WEATHER_UPDATE, { weather: newWeather });
 
     // Rain waters all crops
@@ -157,8 +166,7 @@ export class GameWorld {
   }
 
   _onNewSeason(season) {
-    console.log('New season:', season);
-    // Could remove out-of-season crops, trigger festivals, etc.
+    logger.info('WORLD', `New season: ${season}`);
   }
 
   // --- Player Actions ---
@@ -169,20 +177,24 @@ export class GameWorld {
     this.players.set(socket.id, player);
 
     // Send full world state to joining player
-    socket.emit(ACTIONS.WORLD_STATE, this._getFullState(player.id));
+    const fullState = this._getFullState(player.id);
+    socket.emit(ACTIONS.WORLD_STATE, fullState);
 
     // Notify others
     socket.broadcast.emit(ACTIONS.PLAYER_JOIN, { player: player.getState() });
 
-    console.log(`${player.name} joined (${this.players.size} players online)`);
+    logger.info('GAME', `${player.name} joined`, {
+      socketId: socket.id, playerId: player.id, online: this.players.size,
+      stateSent: { tiles: fullState.tiles.length, crops: fullState.crops.length, npcs: fullState.npcs.length },
+    });
   }
 
   handlePlayerLeave(socketId) {
     const player = this.players.get(socketId);
     if (!player) return;
+    logger.info('GAME', `${player.name} left`, { playerId: player.id, online: this.players.size - 1 });
     this.players.delete(socketId);
     this.io.emit(ACTIONS.PLAYER_LEAVE, { playerId: player.id });
-    console.log(`${player.name} left (${this.players.size} players online)`);
   }
 
   handlePlayerMove(socketId, data) {
@@ -199,14 +211,24 @@ export class GameWorld {
 
   handleTill(socketId, data) {
     const player = this.players.get(socketId);
-    if (!player || !player.useEnergy(2)) return;
-    if (!isValidTile(data.x, data.z)) return;
+    if (!player || !player.useEnergy(2)) {
+      logger.debug('FARM', `Till rejected: no player or no energy`, { socketId, data });
+      return;
+    }
+    if (!isValidTile(data.x, data.z)) {
+      logger.debug('FARM', `Till rejected: invalid tile`, data);
+      return;
+    }
 
     const idx = tileIndex(data.x, data.z);
     const tile = this.tiles[idx];
-    if (tile.type !== TILE_TYPES.DIRT && tile.type !== TILE_TYPES.GRASS) return;
+    if (tile.type !== TILE_TYPES.DIRT && tile.type !== TILE_TYPES.GRASS) {
+      logger.debug('FARM', `Till rejected: tile type ${tile.type} not tillable`, data);
+      return;
+    }
 
     tile.type = TILE_TYPES.TILLED;
+    logger.debug('FARM', `Tilled (${data.x},${data.z}) by ${player.name}`);
     this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'tileChange', x: data.x, z: data.z, tileType: TILE_TYPES.TILLED });
   }
 
@@ -215,21 +237,34 @@ export class GameWorld {
     if (!player) return;
 
     const seedId = data.cropType + '_seed';
-    if (!player.hasItem(seedId)) return;
-    if (!isValidTile(data.x, data.z)) return;
+    if (!player.hasItem(seedId)) {
+      logger.debug('FARM', `Plant rejected: ${player.name} missing ${seedId}`, { inventory: player.inventory });
+      return;
+    }
+    if (!isValidTile(data.x, data.z)) {
+      logger.debug('FARM', `Plant rejected: invalid tile`, data);
+      return;
+    }
 
     const idx = tileIndex(data.x, data.z);
-    if (this.tiles[idx].type !== TILE_TYPES.TILLED) return;
+    if (this.tiles[idx].type !== TILE_TYPES.TILLED) {
+      logger.debug('FARM', `Plant rejected: tile not tilled (type=${this.tiles[idx].type})`, data);
+      return;
+    }
 
     // Check no crop already there
     for (const crop of this.crops.values()) {
-      if (crop.tileX === data.x && crop.tileZ === data.z) return;
+      if (crop.tileX === data.x && crop.tileZ === data.z) {
+        logger.debug('FARM', `Plant rejected: crop already at (${data.x},${data.z})`);
+        return;
+      }
     }
 
     player.removeItem(seedId, 1);
     const crop = new Crop({ tileX: data.x, tileZ: data.z, cropType: data.cropType });
     this.crops.set(crop.id, crop);
 
+    logger.debug('FARM', `${player.name} planted ${data.cropType} at (${data.x},${data.z})`, { cropId: crop.id });
     this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'cropPlanted', crop: crop.getState() });
     this._sendInventoryUpdate(socketId, player);
   }
@@ -256,7 +291,8 @@ export class GameWorld {
         const cropData = cropsData[crop.cropType];
         if (!cropData) continue;
 
-        player.addItem(crop.cropType, 1 + Math.floor(Math.random() * 2));
+        const yield_ = 1 + Math.floor(Math.random() * 2);
+        player.addItem(crop.cropType, yield_);
         player.addXP(cropData.xp);
         this.crops.delete(id);
 
@@ -264,6 +300,9 @@ export class GameWorld {
         const idx = tileIndex(data.x, data.z);
         this.tiles[idx].type = TILE_TYPES.TILLED;
 
+        logger.debug('FARM', `${player.name} harvested ${crop.cropType} x${yield_} at (${data.x},${data.z})`, {
+          xp: cropData.xp, totalXP: player.xp, level: player.level,
+        });
         this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'cropHarvested', cropId: id, x: data.x, z: data.z });
         this._sendInventoryUpdate(socketId, player);
         break;
@@ -273,12 +312,18 @@ export class GameWorld {
 
   handleFishCast(socketId, data) {
     const player = this.players.get(socketId);
-    if (!player || !player.useEnergy(5)) return;
+    if (!player || !player.useEnergy(5)) {
+      logger.debug('FISH', `Cast rejected: no player or no energy`, { socketId });
+      return;
+    }
 
     // Determine location by tile type
     const idx = tileIndex(Math.floor(data.x), Math.floor(data.z));
     if (idx < 0 || idx >= this.tiles.length) return;
-    if (this.tiles[idx].type !== TILE_TYPES.WATER) return;
+    if (this.tiles[idx].type !== TILE_TYPES.WATER) {
+      logger.debug('FISH', `Cast rejected: not water tile at (${data.x},${data.z}), type=${this.tiles[idx]?.type}`);
+      return;
+    }
 
     const location = 'pond'; // Simplified — could check coordinates for river/ocean
     const fish = this.fishCalc.rollCatch(location, player.level);
@@ -286,9 +331,11 @@ export class GameWorld {
     if (fish) {
       player.addItem(fish.id, 1);
       player.addXP(5 + fish.rarity * 10);
+      logger.debug('FISH', `${player.name} caught ${fish.id} (rarity ${fish.rarity})`);
       this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'fishCaught', playerId: player.id, fish });
       this._sendInventoryUpdate(socketId, player);
     } else {
+      logger.debug('FISH', `${player.name} missed (no fish available at ${location})`);
       this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'fishMiss', playerId: player.id });
     }
   }
@@ -298,7 +345,10 @@ export class GameWorld {
     if (!player) return;
 
     const npc = this.npcs.find(n => n.id === data.npcId);
-    if (!npc) return;
+    if (!npc) {
+      logger.warn('NPC', `NPC not found: ${data.npcId}`);
+      return;
+    }
 
     // Get or create relationship
     const db = getDB();
@@ -319,6 +369,7 @@ export class GameWorld {
     }
 
     const dialogue = npc.getDialogue(rel.hearts);
+    logger.debug('NPC', `${player.name} talked to ${npc.name}`, { hearts: rel.hearts });
     this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
       type: 'npcDialogue',
       npcId: npc.id,
