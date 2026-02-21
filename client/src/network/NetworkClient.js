@@ -80,6 +80,7 @@ export class NetworkClient {
   sendAnimalCollect(animalId) { this.socket.emit(ACTIONS.ANIMAL_COLLECT, { animalId }); }
   sendToolUpgrade(tool) { this.socket.emit(ACTIONS.TOOL_UPGRADE, { tool }); }
   sendPlaceSprinkler(sprinklerType, x, z) { this.socket.emit(ACTIONS.PLACE_SPRINKLER, { sprinklerType, x, z }); }
+  sendApplyFertilizer(fertilizerType, x, z) { this.socket.emit(ACTIONS.APPLY_FERTILIZER, { fertilizerType, x, z }); }
   sendShipItem(itemId, quantity = 1) { this.socket.emit(ACTIONS.SHIP_ITEM, { itemId, quantity }); }
   sendChat(message) { this.socket.emit(ACTIONS.CHAT_MESSAGE, { message }); }
 

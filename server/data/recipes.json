@@ -8,5 +8,6 @@
   "iron_bar": { "name": "Iron Bar", "building": "forge", "inputs": {"iron_ore": 5}, "output": "iron_bar", "count": 1, "time": 4, "sellPrice": 100, "xp": 12 },
   "gold_bar": { "name": "Gold Bar", "building": "forge", "inputs": {"gold_ore": 5}, "output": "gold_bar", "count": 1, "time": 5, "sellPrice": 200, "xp": 18 },
   "sprinkler_basic": { "name": "Basic Sprinkler", "building": "forge", "inputs": {"copper_bar": 1, "iron_bar": 1}, "output": "sprinkler_basic", "count": 1, "time": 0.5, "xp": 5 },
-  "sprinkler_quality": { "name": "Quality Sprinkler", "building": "forge", "inputs": {"iron_bar": 1, "gold_bar": 1}, "output": "sprinkler_quality", "count": 1, "time": 1, "xp": 10 }
+  "sprinkler_quality": { "name": "Quality Sprinkler", "building": "forge", "inputs": {"iron_bar": 1, "gold_bar": 1}, "output": "sprinkler_quality", "count": 1, "time": 1, "xp": 10 },
+  "fertilizer_basic": { "name": "Basic Fertilizer", "building": "mill", "inputs": {"wheat": 2}, "output": "fertilizer_basic", "count": 2, "time": 0.5, "xp": 3 }
 }

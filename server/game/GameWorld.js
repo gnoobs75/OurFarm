@@ -4,7 +4,7 @@
 // Supports multiple maps (farm, town) with portal transitions.
 
 import { v4 as uuid } from 'uuid';
-import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA } from '../../shared/constants.js';
+import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA, FERTILIZER_DATA } from '../../shared/constants.js';
 import { isValidTile, tileIndex } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { DecorationGenerator } from './DecorationGenerator.js';
@@ -516,7 +516,7 @@ export class GameWorld {
         if (!cropData) continue;
 
         const yield_ = 1 + Math.floor(Math.random() * 2);
-        const quality = this._rollCropQuality(player.getSkillLevel(SKILLS.FARMING));
+        const quality = this._rollCropQuality(player.getSkillLevel(SKILLS.FARMING), crop.fertilizer);
         player.addItem(crop.cropType, yield_, quality);
         player.addSkillXP(SKILLS.FARMING, cropData.xp);
 
@@ -971,12 +971,42 @@ export class GameWorld {
     });
   }
 
+  handleApplyFertilizer(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!player.hasItem(data.fertilizerType, 1)) return;
+    if (!FERTILIZER_DATA[data.fertilizerType]) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    for (const crop of farmMap.crops.values()) {
+      if (crop.tileX === data.x && crop.tileZ === data.z) {
+        if (crop.fertilizer) return; // already fertilized
+        crop.fertilizer = data.fertilizerType;
+        player.removeItem(data.fertilizerType, 1);
+        this._sendInventoryUpdate(socketId, player);
+        this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+          type: 'cropUpdate', crop: crop.getState(),
+        });
+        return;
+      }
+    }
+  }
+
   // --- Helpers ---
 
-  _rollCropQuality(farmingLevel) {
+  _rollCropQuality(farmingLevel, fertilizer = null) {
     const roll = Math.random();
-    const goldChance = farmingLevel * 0.015;
-    const silverChance = farmingLevel * 0.03;
+    let goldChance = farmingLevel * 0.015;
+    let silverChance = farmingLevel * 0.03;
+
+    if (fertilizer) {
+      const fData = FERTILIZER_DATA[fertilizer];
+      if (fData) {
+        goldChance += fData.qualityBonus * 0.5;
+        silverChance += fData.qualityBonus;
+      }
+    }
+
     if (roll < goldChance) return 2;
     if (roll < goldChance + silverChance) return 1;
     return 0;

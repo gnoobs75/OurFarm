@@ -62,6 +62,12 @@ const ITEMS = {
   sprinkler_basic:   { emoji: '\u{1F4A7}', color: '#888888', name: 'Sprinkler' },
   sprinkler_quality: { emoji: '\u{1F4A7}', color: '#ccaa44', name: 'Quality Sprinkler' },
   sprinkler_iridium: { emoji: '\u{1F4A7}', color: '#8844aa', name: 'Iridium Sprinkler' },
+
+  // Fertilizers
+  fertilizer_basic:   { emoji: '\u{1F9EA}', color: '#8B4513', name: 'Basic Fertilizer' },
+  fertilizer_quality: { emoji: '\u{1F9EA}', color: '#DAA520', name: 'Quality Fertilizer' },
+  speed_gro:          { emoji: '\u{26A1}',  color: '#00AA00', name: 'Speed-Gro' },
+  deluxe_speed_gro:   { emoji: '\u{26A1}',  color: '#00FF00', name: 'Deluxe Speed-Gro' },
 };
 
 const TOOLS = new Set(['hoe', 'watering_can', 'pickaxe', 'axe', 'fishing_rod']);
@@ -82,6 +88,7 @@ export function getToolAction(itemId) {
   if (TOOL_ACTIONS[itemId]) return TOOL_ACTIONS[itemId];
   if (isSeed(itemId)) return 'seeds';
   if (itemId && itemId.startsWith('sprinkler_')) return 'sprinkler';
+  if (itemId && (itemId.startsWith('fertilizer_') || itemId.includes('speed_gro'))) return 'fertilizer';
   return null;
 }
 

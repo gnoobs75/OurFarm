@@ -169,6 +169,9 @@ io.on('connection', (socket) => {
   // Sprinkler placement
   wrap(ACTIONS.PLACE_SPRINKLER, (data) => world.handlePlaceSprinkler(socket.id, data));
 
+  // Fertilizer application
+  wrap(ACTIONS.APPLY_FERTILIZER, (data) => world.handleApplyFertilizer(socket.id, data));
+
   // Shipping bin
   wrap(ACTIONS.SHIP_ITEM, (data) => {
     const player = world.players.get(socket.id);

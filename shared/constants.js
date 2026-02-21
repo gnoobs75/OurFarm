@@ -93,6 +93,7 @@ export const ACTIONS = {
   SHIP_ITEM: 'ship:item',
   TOOL_UPGRADE: 'tool:upgrade',
   PLACE_SPRINKLER: 'farm:placeSprinkler',
+  APPLY_FERTILIZER: 'farm:fertilize',
   WORLD_STATE: 'world:state',
   WORLD_UPDATE: 'world:update',
   TIME_UPDATE: 'time:update',
@@ -171,3 +172,10 @@ for (let dx = -2; dx <= 2; dx++) {
     SPRINKLER_DATA.sprinkler_iridium.tiles.push([dx, dz]);
   }
 }
+
+export const FERTILIZER_DATA = {
+  fertilizer_basic: { qualityBonus: 0.10, speedBonus: 0 },
+  fertilizer_quality: { qualityBonus: 0.25, speedBonus: 0 },
+  speed_gro: { qualityBonus: 0, speedBonus: 0.10 },
+  deluxe_speed_gro: { qualityBonus: 0, speedBonus: 0.25 },
+};

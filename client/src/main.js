@@ -201,6 +201,9 @@ async function main() {
         case 'sprinkler':
           network.sendPlaceSprinkler(activeItem.itemId, tile.x, tile.z);
           break;
+        case 'fertilizer':
+          network.sendApplyFertilizer(activeItem.itemId, tile.x, tile.z);
+          break;
       }
 
       // Queue the tool animation on the local player
