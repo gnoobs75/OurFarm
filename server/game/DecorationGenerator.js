@@ -29,11 +29,18 @@ export class DecorationGenerator {
     const farmLeft = cx - 7, farmRight = cx + 7;
     const farmTop = cz - 6, farmBottom = cz + 6;
 
+    // Town zone — skip decorations here (NPC buildings/streets live here)
+    const townLeft = 24, townRight = 50;
+    const townTop = 2, townBottom = 16;
+
     for (let i = 0; i < tiles.length; i++) {
       const { x, z, type } = tiles[i];
 
       // Skip farm zone entirely
       if (x >= farmLeft && x <= farmRight && z >= farmTop && z <= farmBottom) continue;
+
+      // Skip town zone entirely
+      if (x >= townLeft && x <= townRight && z >= townTop && z <= townBottom) continue;
 
       const r = this._rand(x, z);
       const dx = (x - cx) / cx;
