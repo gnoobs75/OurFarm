@@ -19,6 +19,7 @@ import { AnimalRenderer } from './entities/AnimalRenderer.js';
 import { HUD } from './ui/HUD.js';
 import { InventoryUI } from './ui/Inventory.js';
 import { DialogueUI } from './ui/DialogueUI.js';
+import { DebugWindow } from './ui/DebugWindow.js';
 import { tileToWorld } from '@shared/TileMap.js';
 import { TILE_TYPES } from '@shared/constants.js';
 import { debugClient } from './utils/DebugClient.js';
@@ -46,6 +47,8 @@ async function main() {
   const hud = new HUD(document.getElementById('hud'));
   const inventoryUI = new InventoryUI(document.getElementById('inventory-panel'));
   const dialogueUI = new DialogueUI(document.getElementById('dialogue-panel'));
+  const debugWindow = new DebugWindow();
+  debugWindow.setRenderer(sceneManager.renderer);
 
   // --- Network ---
   const network = new NetworkClient();
@@ -147,6 +150,7 @@ async function main() {
     // --- Keyboard shortcuts ---
     input.on('keyDown', ({ key }) => {
       if (key === 'e' || key === 'E') inventoryUI.toggle();
+      if (key === 'F3') debugWindow.toggle();
       if (key >= '1' && key <= '6') hud.selectSlot(parseInt(key) - 1);
     });
 
@@ -213,6 +217,16 @@ async function main() {
       npcs.update(delta);
       pets.update(delta);
       animals.update(delta);
+
+      // Debug window
+      debugWindow.update(delta);
+      debugWindow.setEntityCounts({
+        Players: players.playerMeshes.size,
+        NPCs: npcs.npcMeshes ? npcs.npcMeshes.size : 0,
+        Crops: crops.cropMeshes ? crops.cropMeshes.size : 0,
+        Pets: pets.petMeshes ? pets.petMeshes.size : 0,
+        Animals: animals.animalMeshes ? animals.animalMeshes.size : 0,
+      });
     });
 
     sceneManager.start();

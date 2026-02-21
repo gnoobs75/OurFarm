@@ -179,6 +179,69 @@ body {
   border-color: #ffcc00;
 }
 
+/* Debug Window */
+#debug-window {
+  position: absolute;
+  top: 50px;
+  right: 10px;
+  width: 200px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(100, 255, 100, 0.3);
+  border-radius: 6px;
+  padding: 8px;
+  color: #ccc;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 11px;
+  z-index: 20;
+  pointer-events: none;
+  user-select: none;
+}
+
+.debug-header {
+  color: #4f4;
+  font-weight: bold;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(100, 255, 100, 0.2);
+  padding-bottom: 4px;
+}
+
+.debug-header .debug-toggle {
+  float: right;
+  color: #888;
+  font-weight: normal;
+}
+
+.debug-section {
+  margin-bottom: 6px;
+}
+
+.debug-label {
+  color: #8cf;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.debug-row {
+  display: flex;
+  justify-content: space-between;
+  line-height: 1.5;
+}
+
+.debug-row span:last-child {
+  color: #fff;
+  text-align: right;
+}
+
+#dbg-fps-graph {
+  display: block;
+  width: 100%;
+  height: 40px;
+  margin-top: 4px;
+  border-radius: 3px;
+}
+
 @media (max-width: 600px) {
   .inventory-grid {
     grid-template-columns: repeat(5, 44px);
