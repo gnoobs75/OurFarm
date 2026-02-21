@@ -119,6 +119,14 @@ export class GameWorld {
     farmMap.buildings.set('barn_main', {
       id: 'barn_main', type: 'barn', tileX: cx - 4, tileZ: cz + 3,
     });
+    farmMap.buildings.set('farm_mill', {
+      id: 'farm_mill', type: 'mill', tileX: 38, tileZ: 31,
+      processing: null,
+    });
+    farmMap.buildings.set('farm_forge', {
+      id: 'farm_forge', type: 'forge', tileX: 38, tileZ: 34,
+      processing: null,
+    });
 
     // Pre-till a crop plot
     for (let px = cx + 2; px <= cx + 6; px++) {
@@ -728,6 +736,83 @@ export class GameWorld {
     });
   }
 
+  handleCraftStart(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const building = farmMap.buildings.get(data.buildingId);
+    if (!building) return;
+    if (building.processing) {
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+        type: 'craftError', message: 'This machine is already processing.',
+      });
+      return;
+    }
+
+    const recipe = recipesData[data.recipeId];
+    if (!recipe || recipe.building !== building.type) return;
+
+    // Check player has all inputs
+    for (const [itemId, qty] of Object.entries(recipe.inputs)) {
+      if (!player.hasItem(itemId, qty)) {
+        this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+          type: 'craftError', message: `Need more ${itemId}.`,
+        });
+        return;
+      }
+    }
+
+    // Consume inputs
+    for (const [itemId, qty] of Object.entries(recipe.inputs)) {
+      player.removeItem(itemId, qty);
+    }
+
+    // Start processing (time in hours -> milliseconds)
+    const now = Date.now();
+    building.processing = {
+      recipeId: data.recipeId,
+      startTime: now,
+      endTime: now + recipe.time * 3600 * 1000,
+    };
+
+    this._sendInventoryUpdate(socketId, player);
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'craftStarted', buildingId: building.id, recipeId: data.recipeId,
+      endTime: building.processing.endTime,
+    });
+  }
+
+  handleCraftCollect(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const building = farmMap.buildings.get(data.buildingId);
+    if (!building || !building.processing) return;
+
+    if (Date.now() < building.processing.endTime) {
+      const remaining = Math.ceil((building.processing.endTime - Date.now()) / 60000);
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+        type: 'craftError', message: `Still processing. ${remaining} min left.`,
+      });
+      return;
+    }
+
+    const recipe = recipesData[building.processing.recipeId];
+    if (!recipe) return;
+
+    player.addItem(recipe.output, recipe.count || 1);
+    player.addSkillXP(SKILLS.FARMING, recipe.xp || 5);
+    building.processing = null;
+
+    this._sendInventoryUpdate(socketId, player);
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'craftCollected', buildingId: building.id,
+      itemId: recipe.output, quantity: recipe.count || 1,
+    });
+  }
+
   handleShopBuy(socketId, data) {
     const player = this.players.get(socketId);
     if (!player) return;
@@ -872,6 +957,7 @@ export class GameWorld {
       buildings: mapState.buildings,
       time: this.time.getState(),
       weather: this.weather.getState(),
+      recipes: recipesData,
     };
   }
 

@@ -20,6 +20,7 @@ import { AnimalRenderer } from './entities/AnimalRenderer.js';
 import { HUD } from './ui/HUD.js';
 import { InventoryUI } from './ui/Inventory.js';
 import { DialogueUI } from './ui/DialogueUI.js';
+import { CraftingUI } from './ui/CraftingUI.js';
 import { DebugWindow } from './ui/DebugWindow.js';
 import { getToolAction, isSeed } from './ui/ItemIcons.js';
 import { tileToWorld } from '@shared/TileMap.js';
@@ -51,6 +52,7 @@ async function main() {
   const dialogueUI = new DialogueUI(document.getElementById('dialogue-panel'));
   const debugWindow = new DebugWindow();
   debugWindow.setRenderer(sceneManager.renderer);
+  const craftingUI = new CraftingUI();
 
   // Wire backpack right-click → action bar quick-add
   inventoryUI.onQuickAdd = (itemId) => {
@@ -99,13 +101,24 @@ async function main() {
     // Ambient creatures (client-side only)
     let creatures = new AmbientCreatureRenderer(sceneManager.scene, state.tiles);
 
+    // Store recipes and buildings for crafting UI
+    const recipes = state.recipes || {};
+    const buildingsMap = {};
+    for (const b of state.buildings || []) {
+      buildingsMap[b.id] = b;
+    }
+
+    // Wire crafting callbacks
+    craftingUI.onCraftStart = (buildingId, recipeId) => network.sendCraftStart(buildingId, recipeId);
+    craftingUI.onCraftCollect = (buildingId) => network.sendCraftCollect(buildingId);
+
     // Add players
     for (const p of state.players) {
       players.addPlayer(p, p.id === state.playerId);
     }
 
     // Update HUD
-    const localPlayer = state.players.find(p => p.id === state.playerId);
+    let localPlayer = state.players.find(p => p.id === state.playerId);
     if (localPlayer) {
       hud.updateStats(localPlayer);
       hud.initActionBar(localPlayer.inventory);
@@ -187,6 +200,23 @@ async function main() {
     input.on('keyDown', ({ key }) => {
       if (key === 'i' || key === 'I') inventoryUI.toggle();
       if (key === 'F3') debugWindow.toggle();
+      if (key === 'c' || key === 'C') {
+        if (craftingUI.visible) {
+          craftingUI.hide();
+        } else {
+          // Find nearest crafting building
+          const craftBuildings = [];
+          for (const [id, b] of Object.entries(buildingsMap)) {
+            if (b.type === 'mill' || b.type === 'forge') {
+              craftBuildings.push(b);
+            }
+          }
+          if (craftBuildings.length > 0) {
+            const b = craftBuildings[0];
+            craftingUI.show(b.id, b.type, recipes, localPlayer?.inventory || [], b.processing);
+          }
+        }
+      }
       // Keys 1-9 select action bar slots 0-8, 0 selects slot 9
       if (key >= '1' && key <= '9') hud.selectSlot(parseInt(key) - 1);
       if (key === '0') hud.selectSlot(9);
@@ -239,6 +269,21 @@ async function main() {
           crops.dispose();
           crops.build(data.crops);
           break;
+        case 'craftStarted':
+          if (buildingsMap[data.buildingId]) {
+            buildingsMap[data.buildingId].processing = { recipeId: data.recipeId, endTime: data.endTime };
+          }
+          console.log('Crafting started!');
+          break;
+        case 'craftCollected':
+          if (buildingsMap[data.buildingId]) {
+            buildingsMap[data.buildingId].processing = null;
+          }
+          console.log(`Collected: ${data.itemId} x${data.quantity}`);
+          break;
+        case 'craftError':
+          console.log(data.message);
+          break;
         case 'playerCollapse':
           console.log(`You collapsed! Lost ${data.penalty} coins.`);
           break;
@@ -264,6 +309,12 @@ async function main() {
           animals.dispose();
           animals.build(ms.animals || []);
 
+          // Rebuild buildings map for new map
+          for (const key of Object.keys(buildingsMap)) delete buildingsMap[key];
+          for (const b of ms.buildings || []) {
+            buildingsMap[b.id] = b;
+          }
+
           // Reposition player
           if (data.spawnX !== undefined) {
             sceneManager.panTo(data.spawnX, data.spawnZ);
@@ -283,6 +334,7 @@ async function main() {
       hud.updateStats(data);
       hud.syncQuantities(data.inventory);
       inventoryUI.update(data.inventory);
+      if (localPlayer) localPlayer.inventory = data.inventory;
     });
     network.on('playerJoin', (data) => {
       players.addPlayer(data.player, false);
