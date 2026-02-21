@@ -1,5 +1,5 @@
 // server/entities/Player.js
-import { SKILLS, SKILL_MAX_LEVEL, xpForSkillLevel } from '../../shared/constants.js';
+import { SKILLS, SKILL_MAX_LEVEL, xpForSkillLevel, PROFESSIONS } from '../../shared/constants.js';
 
 export class Player {
   constructor(data) {
@@ -11,8 +11,15 @@ export class Player {
     this.energy = data.energy ?? 100;
     this.maxEnergy = data.maxEnergy ?? 100;
     this.inventory = data.inventory || this._defaultInventory();
+    this.currentMap = data.currentMap || 'farm';
     this.activeToolSlot = 0;
     this.socketId = data.socketId;
+    this.toolTiers = data.toolTiers || {
+      hoe: 0, watering_can: 0, pickaxe: 0, axe: 0, fishing_rod: 0,
+    };
+
+    // Professions — maps skill name to array of chosen profession IDs
+    this.professions = data.professions || {};
 
     // Skills — initialize all to 0/0
     this.skills = {};
@@ -84,6 +91,11 @@ export class Player {
       skill.level++;
       this.maxEnergy += 2;
       leveled = true;
+
+      // Check if this level unlocks a profession choice
+      if (skill.level === 5 || skill.level === 10) {
+        this._pendingProfession = { skill: skillName, level: skill.level };
+      }
     }
 
     this.level = this._calcLevel();
@@ -105,16 +117,50 @@ export class Player {
     return true;
   }
 
+  hasProfession(profId) {
+    for (const profs of Object.values(this.professions)) {
+      if (profs.includes(profId)) return true;
+    }
+    return false;
+  }
+
+  getProfessionBonus(bonusKey) {
+    let total = 0;
+    for (const profs of Object.values(this.professions)) {
+      for (const profId of profs) {
+        for (const skillData of Object.values(PROFESSIONS)) {
+          // Check level 5 options
+          for (const opt of skillData[5] || []) {
+            if (opt.id === profId && opt.bonus[bonusKey] !== undefined) {
+              total += typeof opt.bonus[bonusKey] === 'number' ? opt.bonus[bonusKey] : 0;
+            }
+          }
+          // Check level 10 options
+          for (const branch of Object.values(skillData[10] || {})) {
+            for (const opt of branch) {
+              if (opt.id === profId && opt.bonus[bonusKey] !== undefined) {
+                total += typeof opt.bonus[bonusKey] === 'number' ? opt.bonus[bonusKey] : 0;
+              }
+            }
+          }
+        }
+      }
+    }
+    return total;
+  }
+
   getState() {
     return {
       id: this.id, name: this.name,
-      x: this.x, z: this.z,
+      x: this.x, z: this.z, currentMap: this.currentMap,
       coins: this.coins,
       level: this.level,
       energy: Math.floor(this.energy),
       maxEnergy: this.maxEnergy,
       skills: this.skills,
+      professions: this.professions,
       inventory: this.inventory,
+      toolTiers: this.toolTiers,
     };
   }
 }

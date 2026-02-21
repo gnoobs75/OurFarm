@@ -15,13 +15,11 @@ export class Animal {
 
   feed() { this.fedToday = true; this.happiness = Math.min(100, this.happiness + 20); }
 
-  tickHour(animalData) {
-    if (this.fedToday) {
-      this._hoursSinceProduct++;
-      if (this._hoursSinceProduct >= animalData.productInterval) {
-        this.productReady = true;
-        this._hoursSinceProduct = 0;
-      }
+  tickHour(animalData, hoursElapsed = 1) {
+    if (!this.fedToday) return;
+    this._hoursSinceProduct += hoursElapsed;
+    if (this._hoursSinceProduct >= animalData.productInterval) {
+      this.productReady = true;
     }
   }
 

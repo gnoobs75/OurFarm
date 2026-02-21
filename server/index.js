@@ -55,13 +55,13 @@ app.post('/api/debug/client-error', (req, res) => {
 app.get('/api/debug/state', (req, res) => {
   res.json({
     players: Array.from(world.players.values()).map(p => p.getState()),
-    crops: world.crops.size,
-    animals: world.animals.size,
-    pets: world.pets.size,
-    npcs: world.npcs.length,
+    maps: world.maps.size,
+    farmCrops: world.maps.get('farm')?.crops.size,
+    farmAnimals: world.maps.get('farm')?.animals.size,
+    farmPets: world.maps.get('farm')?.pets.size,
+    townNpcs: world.maps.get('town')?.npcs.length,
     time: world.time?.getState(),
     weather: world.weather?.getState(),
-    tileCount: world.tiles?.length,
   });
 });
 
@@ -101,7 +101,11 @@ app.get('/api/debug/logs/:filename', (req, res) => {
 // Create game world
 logger.info('SERVER', 'Initializing GameWorld...');
 const world = new GameWorld(io);
-logger.info('SERVER', 'GameWorld initialized', { tiles: world.tiles.length, npcs: world.npcs.length });
+logger.info('SERVER', 'GameWorld initialized', {
+  maps: world.maps.size,
+  farmTiles: world.maps.get('farm')?.tiles.length,
+  townNpcs: world.maps.get('town')?.npcs.length,
+});
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
@@ -142,10 +146,42 @@ io.on('connection', (socket) => {
 
   // NPC interaction
   wrap(ACTIONS.NPC_TALK, (data) => world.handleNPCTalk(socket.id, data));
+  wrap(ACTIONS.NPC_GIFT, (data) => world.handleNPCGift(socket.id, data));
+
+  // Animal interaction
+  wrap(ACTIONS.ANIMAL_FEED, (data) => world.handleAnimalFeed(socket.id, data));
+  wrap(ACTIONS.ANIMAL_COLLECT, (data) => world.handleAnimalCollect(socket.id, data));
+
+  // Pet interaction
+  wrap(ACTIONS.PET_INTERACT, (data) => world.handlePetInteract(socket.id, data));
+
+  // Crafting
+  wrap(ACTIONS.CRAFT_START, (data) => world.handleCraftStart(socket.id, data));
+  wrap(ACTIONS.CRAFT_COLLECT, (data) => world.handleCraftCollect(socket.id, data));
 
   // Shop
   wrap(ACTIONS.SHOP_BUY, (data) => world.handleShopBuy(socket.id, data));
   wrap(ACTIONS.SHOP_SELL, (data) => world.handleShopSell(socket.id, data));
+
+  // Tool upgrade
+  wrap(ACTIONS.TOOL_UPGRADE, (data) => world.handleToolUpgrade(socket.id, data));
+
+  // Sprinkler placement
+  wrap(ACTIONS.PLACE_SPRINKLER, (data) => world.handlePlaceSprinkler(socket.id, data));
+
+  // Fertilizer application
+  wrap(ACTIONS.APPLY_FERTILIZER, (data) => world.handleApplyFertilizer(socket.id, data));
+
+  // Processing machines
+  wrap(ACTIONS.PLACE_MACHINE, (data) => world.handlePlaceMachine(socket.id, data));
+  wrap(ACTIONS.MACHINE_INPUT, (data) => world.handleMachineInput(socket.id, data));
+  wrap(ACTIONS.MACHINE_COLLECT, (data) => world.handleMachineCollect(socket.id, data));
+
+  // Foraging
+  wrap(ACTIONS.FORAGE_COLLECT, (data) => world.handleForageCollect(socket.id, data));
+
+  // Profession choice
+  wrap(ACTIONS.PROFESSION_CHOICE, (data) => world.handleProfessionChoice(socket.id, data));
 
   // Shipping bin
   wrap(ACTIONS.SHIP_ITEM, (data) => {

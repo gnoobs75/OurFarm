@@ -6,5 +6,12 @@
   "cloth": { "name": "Cloth", "building": "loom", "inputs": {"wool": 2}, "output": "cloth", "count": 1, "time": 3, "sellPrice": 120, "xp": 10 },
   "copper_bar": { "name": "Copper Bar", "building": "forge", "inputs": {"copper_ore": 5}, "output": "copper_bar", "count": 1, "time": 3, "sellPrice": 60, "xp": 8 },
   "iron_bar": { "name": "Iron Bar", "building": "forge", "inputs": {"iron_ore": 5}, "output": "iron_bar", "count": 1, "time": 4, "sellPrice": 100, "xp": 12 },
-  "gold_bar": { "name": "Gold Bar", "building": "forge", "inputs": {"gold_ore": 5}, "output": "gold_bar", "count": 1, "time": 5, "sellPrice": 200, "xp": 18 }
+  "gold_bar": { "name": "Gold Bar", "building": "forge", "inputs": {"gold_ore": 5}, "output": "gold_bar", "count": 1, "time": 5, "sellPrice": 200, "xp": 18 },
+  "sprinkler_basic": { "name": "Basic Sprinkler", "building": "forge", "inputs": {"copper_bar": 1, "iron_bar": 1}, "output": "sprinkler_basic", "count": 1, "time": 0.5, "xp": 5 },
+  "sprinkler_quality": { "name": "Quality Sprinkler", "building": "forge", "inputs": {"iron_bar": 1, "gold_bar": 1}, "output": "sprinkler_quality", "count": 1, "time": 1, "xp": 10 },
+  "fertilizer_basic": { "name": "Basic Fertilizer", "building": "mill", "inputs": {"wheat": 2}, "output": "fertilizer_basic", "count": 2, "time": 0.5, "xp": 3 },
+  "keg": { "name": "Keg", "building": "forge", "inputs": {"copper_bar": 1, "iron_bar": 1, "wheat": 5}, "output": "keg", "count": 1, "time": 2, "xp": 15 },
+  "preserves_jar": { "name": "Preserves Jar", "building": "forge", "inputs": {"copper_bar": 1, "iron_bar": 1}, "output": "preserves_jar", "count": 1, "time": 1, "xp": 10 },
+  "cheese_press_recipe": { "name": "Cheese Press", "building": "forge", "inputs": {"copper_bar": 2, "iron_bar": 1}, "output": "cheese_press", "count": 1, "time": 1.5, "xp": 12 },
+  "mayonnaise_machine_recipe": { "name": "Mayonnaise Machine", "building": "forge", "inputs": {"copper_bar": 1, "iron_bar": 1}, "output": "mayonnaise_machine", "count": 1, "time": 1, "xp": 10 }
 }

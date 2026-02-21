@@ -71,11 +71,11 @@ export class SceneManager {
     this.sunLight = new THREE.DirectionalLight(0xffe0a0, 1.1);
     this.sunLight.position.set(20, 30, 15);
     this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.set(2048, 2048);
-    this.sunLight.shadow.camera.left = -50;
-    this.sunLight.shadow.camera.right = 50;
-    this.sunLight.shadow.camera.top = 50;
-    this.sunLight.shadow.camera.bottom = -50;
+    this.sunLight.shadow.mapSize.set(1024, 1024);
+    this.sunLight.shadow.camera.left = -40;
+    this.sunLight.shadow.camera.right = 40;
+    this.sunLight.shadow.camera.top = 40;
+    this.sunLight.shadow.camera.bottom = -40;
     this.sunLight.shadow.camera.near = 1;
     this.sunLight.shadow.camera.far = 120;
     this.scene.add(this.sunLight);

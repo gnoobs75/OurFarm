@@ -1,0 +1,139 @@
+// client/src/ui/ItemIcons.js
+// Maps itemId → display info (emoji, color, name) for all game items.
+
+const ITEMS = {
+  // Tools
+  hoe:          { emoji: '\u{1F33E}', color: '#b87333', name: 'Hoe' },
+  watering_can: { emoji: '\u{1F4A7}', color: '#4488cc', name: 'Watering Can' },
+  pickaxe:      { emoji: '\u{26CF}',  color: '#888899', name: 'Pickaxe' },
+  axe:          { emoji: '\u{1FA93}', color: '#8b6b4a', name: 'Axe' },
+  fishing_rod:  { emoji: '\u{1F3A3}', color: '#4a7a2a', name: 'Fishing Rod' },
+
+  // Seeds
+  wheat_seed:      { emoji: '\u{1F331}', color: '#daa520', name: 'Wheat Seeds' },
+  corn_seed:       { emoji: '\u{1F331}', color: '#f5d142', name: 'Corn Seeds' },
+  tomato_seed:     { emoji: '\u{1F331}', color: '#e74c3c', name: 'Tomato Seeds' },
+  carrot_seed:     { emoji: '\u{1F331}', color: '#ff8c00', name: 'Carrot Seeds' },
+  potato_seed:     { emoji: '\u{1F331}', color: '#8b7355', name: 'Potato Seeds' },
+  strawberry_seed: { emoji: '\u{1F331}', color: '#ff3366', name: 'Strawberry Seeds' },
+  pumpkin_seed:    { emoji: '\u{1F331}', color: '#ff7518', name: 'Pumpkin Seeds' },
+  blueberry_seed:  { emoji: '\u{1F331}', color: '#4169e1', name: 'Blueberry Seeds' },
+
+  // Harvested crops
+  wheat:      { emoji: '\u{1F33E}', color: '#daa520', name: 'Wheat' },
+  corn:       { emoji: '\u{1F33D}', color: '#f5d142', name: 'Corn' },
+  tomato:     { emoji: '\u{1F345}', color: '#e74c3c', name: 'Tomato' },
+  carrot:     { emoji: '\u{1F955}', color: '#ff8c00', name: 'Carrot' },
+  potato:     { emoji: '\u{1F954}', color: '#8b7355', name: 'Potato' },
+  strawberry: { emoji: '\u{1F353}', color: '#ff3366', name: 'Strawberry' },
+  pumpkin:    { emoji: '\u{1F383}', color: '#ff7518', name: 'Pumpkin' },
+  blueberry:  { emoji: '\u{1FAD0}', color: '#4169e1', name: 'Blueberry' },
+
+  // Fish
+  bass:       { emoji: '\u{1F41F}', color: '#4a7a2a', name: 'Bass' },
+  trout:      { emoji: '\u{1F41F}', color: '#cc6644', name: 'Trout' },
+  salmon:     { emoji: '\u{1F41F}', color: '#ff6655', name: 'Salmon' },
+  catfish:    { emoji: '\u{1F41F}', color: '#776655', name: 'Catfish' },
+  carp:       { emoji: '\u{1F41F}', color: '#aa8844', name: 'Carp' },
+  pike:       { emoji: '\u{1F41F}', color: '#556644', name: 'Pike' },
+  sturgeon:   { emoji: '\u{1F41F}', color: '#445566', name: 'Sturgeon' },
+
+  // Animal products
+  egg:        { emoji: '\u{1F95A}', color: '#fff8ee', name: 'Egg' },
+  milk:       { emoji: '\u{1F95B}', color: '#ffffff', name: 'Milk' },
+  wool:       { emoji: '\u{1F9F6}', color: '#eeeeee', name: 'Wool' },
+
+  // Processed / crafted items
+  flour:        { emoji: '\u{1F33E}', color: '#f5e6c8', name: 'Flour' },
+  bread:        { emoji: '\u{1F35E}', color: '#d4a34a', name: 'Bread' },
+  cake:         { emoji: '\u{1F370}', color: '#ffccdd', name: 'Cake' },
+  cheese_wheel: { emoji: '\u{1F9C0}', color: '#f0c040', name: 'Cheese Wheel' },
+  cloth:        { emoji: '\u{1F9F5}', color: '#dde8f0', name: 'Cloth' },
+  copper_bar:   { emoji: '\u{1F7E7}', color: '#b87333', name: 'Copper Bar' },
+  iron_bar:     { emoji: '\u{2B1C}',  color: '#a8a8a8', name: 'Iron Bar' },
+  gold_bar:     { emoji: '\u{1F7E8}', color: '#ffd700', name: 'Gold Bar' },
+
+  // Ores (for crafting inputs)
+  copper_ore:   { emoji: '\u{1FAA8}', color: '#b87333', name: 'Copper Ore' },
+  iron_ore:     { emoji: '\u{1FAA8}', color: '#a0a0a0', name: 'Iron Ore' },
+  gold_ore:     { emoji: '\u{1FAA8}', color: '#ffd700', name: 'Gold Ore' },
+
+  // Sprinklers
+  sprinkler_basic:   { emoji: '\u{1F4A7}', color: '#888888', name: 'Sprinkler' },
+  sprinkler_quality: { emoji: '\u{1F4A7}', color: '#ccaa44', name: 'Quality Sprinkler' },
+  sprinkler_iridium: { emoji: '\u{1F4A7}', color: '#8844aa', name: 'Iridium Sprinkler' },
+
+  // Fertilizers
+  fertilizer_basic:   { emoji: '\u{1F9EA}', color: '#8B4513', name: 'Basic Fertilizer' },
+  fertilizer_quality: { emoji: '\u{1F9EA}', color: '#DAA520', name: 'Quality Fertilizer' },
+  speed_gro:          { emoji: '\u{26A1}',  color: '#00AA00', name: 'Speed-Gro' },
+  deluxe_speed_gro:   { emoji: '\u{26A1}',  color: '#00FF00', name: 'Deluxe Speed-Gro' },
+
+  // Machines
+  keg:                { emoji: '\u{1F6E2}', color: '#8B4513', name: 'Keg' },
+  preserves_jar:      { emoji: '\u{1FAD9}', color: '#AADDFF', name: 'Preserves Jar' },
+  cheese_press:       { emoji: '\u{1F9C0}', color: '#DEB887', name: 'Cheese Press' },
+  mayonnaise_machine: { emoji: '\u{1F95A}', color: '#EEEEDD', name: 'Mayonnaise Machine' },
+
+  // Artisan goods
+  wine:               { emoji: '\u{1F377}', color: '#722F37', name: 'Wine' },
+  juice:              { emoji: '\u{1F9C3}', color: '#FFA500', name: 'Juice' },
+  preserves:          { emoji: '\u{1FAD9}', color: '#8B0000', name: 'Preserves' },
+  cheese:             { emoji: '\u{1F9C0}', color: '#FFD700', name: 'Cheese' },
+  mayonnaise:         { emoji: '\u{1F944}', color: '#FFFACD', name: 'Mayonnaise' },
+
+  // Spring forage
+  daffodil:           { emoji: '\u{1F33C}', color: '#FFD700', name: 'Daffodil' },
+  leek:               { emoji: '\u{1F96C}', color: '#228B22', name: 'Leek' },
+  dandelion:          { emoji: '\u{1F33B}', color: '#FFD700', name: 'Dandelion' },
+  spring_onion:       { emoji: '\u{1F9C5}', color: '#90EE90', name: 'Spring Onion' },
+
+  // Summer forage
+  grape:              { emoji: '\u{1F347}', color: '#6B3FA0', name: 'Grape' },
+  spice_berry:        { emoji: '\u{1FAD0}', color: '#FF4444', name: 'Spice Berry' },
+  sweet_pea:          { emoji: '\u{1F338}', color: '#FFB6C1', name: 'Sweet Pea' },
+  fiddlehead_fern:    { emoji: '\u{1F33F}', color: '#006400', name: 'Fiddlehead Fern' },
+
+  // Fall forage
+  wild_plum:          { emoji: '\u{1FAD0}', color: '#4B0082', name: 'Wild Plum' },
+  hazelnut:           { emoji: '\u{1F330}', color: '#8B4513', name: 'Hazelnut' },
+  blackberry:         { emoji: '\u{1FAD0}', color: '#1C1C1C', name: 'Blackberry' },
+  chanterelle:        { emoji: '\u{1F344}', color: '#FFB347', name: 'Chanterelle' },
+
+  // Winter forage
+  crystal_fruit:      { emoji: '\u{1F48E}', color: '#ADD8E6', name: 'Crystal Fruit' },
+  crocus:             { emoji: '\u{1F337}', color: '#9370DB', name: 'Crocus' },
+  snow_yam:           { emoji: '\u{1F954}', color: '#F5F5DC', name: 'Snow Yam' },
+  winter_root:        { emoji: '\u{1F955}', color: '#8B4513', name: 'Winter Root' },
+};
+
+const TOOLS = new Set(['hoe', 'watering_can', 'pickaxe', 'axe', 'fishing_rod']);
+
+const TOOL_ACTIONS = {
+  hoe: 'hoe',
+  watering_can: 'watering_can',
+  pickaxe: 'pickaxe',
+  axe: 'axe',
+  fishing_rod: 'fishing_rod',
+};
+
+export function getItemIcon(itemId) {
+  return ITEMS[itemId] || { emoji: '\u{2753}', color: '#aaaaaa', name: itemId };
+}
+
+export function getToolAction(itemId) {
+  if (TOOL_ACTIONS[itemId]) return TOOL_ACTIONS[itemId];
+  if (isSeed(itemId)) return 'seeds';
+  if (itemId && itemId.startsWith('sprinkler_')) return 'sprinkler';
+  if (itemId && (itemId.startsWith('fertilizer_') || itemId.includes('speed_gro'))) return 'fertilizer';
+  if (['keg', 'preserves_jar', 'cheese_press', 'mayonnaise_machine'].includes(itemId)) return 'machine';
+  return null;
+}
+
+export function isTool(itemId) {
+  return TOOLS.has(itemId);
+}
+
+export function isSeed(itemId) {
+  return itemId && itemId.endsWith('_seed');
+}

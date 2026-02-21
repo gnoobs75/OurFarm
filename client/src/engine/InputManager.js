@@ -16,6 +16,8 @@ export class InputManager {
     // Event handlers
     this._handlers = {
       tileClick: [],
+      tileAction: [],
+      tileMove: [],
       tileHover: [],
       keyDown: [],
     };
@@ -98,7 +100,15 @@ export class InputManager {
     const worldPos = this.scene.screenToWorld(pos.x, pos.y);
     if (worldPos) {
       const tile = worldToTile(worldPos.x, worldPos.z);
-      this._emit('tileClick', { tile, worldPos, button: e.button });
+      const data = { tile, worldPos, button: e.button };
+      // Left-click (button 0) = tool action, Right-click (button 2) = move
+      if (e.button === 2) {
+        this._emit('tileMove', data);
+      } else {
+        this._emit('tileAction', data);
+      }
+      // Backward compatibility
+      this._emit('tileClick', data);
     }
   }
 

@@ -23,6 +23,12 @@ export function getDB() {
       // Run schema
       const schema = readFileSync(join(__dirname, 'schema.sql'), 'utf-8');
       db.exec(schema);
+
+      // Migrations: add columns that may not exist in older databases
+      try {
+        db.exec('ALTER TABLE players ADD COLUMN professions TEXT DEFAULT \'{}\'');
+      } catch (_) { /* column already exists */ }
+
       logger.info('DB', 'Schema initialized successfully');
     } catch (err) {
       logger.error('DB', 'Failed to initialize database', { error: err.message, stack: err.stack });

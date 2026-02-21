@@ -72,59 +72,11 @@ body {
   color: #fff;
 }
 
-#inventory-panel {
-  bottom: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-}
+/* ═══════════════════════════════════════════
+   ACTION BAR — 10 slots at bottom center
+   ═══════════════════════════════════════════ */
 
-.inventory-grid {
-  display: grid;
-  grid-template-columns: repeat(9, 48px);
-  gap: 4px;
-}
-
-.inventory-slot {
-  width: 48px;
-  height: 48px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  position: relative;
-}
-
-.inventory-slot.selected {
-  border-color: #ffcc00;
-  background: rgba(255, 204, 0, 0.2);
-}
-
-.inventory-slot .count {
-  position: absolute;
-  bottom: 2px;
-  right: 4px;
-  font-size: 10px;
-}
-
-.inventory-slot.quality-silver {
-  border-color: #c0c0c0;
-  box-shadow: inset 0 0 6px rgba(192, 192, 192, 0.4);
-}
-
-.inventory-slot.quality-gold {
-  border-color: #ffd700;
-  box-shadow: inset 0 0 6px rgba(255, 215, 0, 0.4);
-}
-
-.inventory-slot.quality-iridium {
-  border-color: #b366ff;
-  box-shadow: inset 0 0 6px rgba(179, 102, 255, 0.4);
-}
-
-.toolbar {
+.actionbar {
   position: absolute;
   bottom: 10px;
   left: 50%;
@@ -134,25 +86,169 @@ body {
   pointer-events: auto;
 }
 
-.toolbar-slot {
+.actionbar-slot {
   width: 52px;
   height: 52px;
   background: rgba(20, 15, 10, 0.8);
   border: 2px solid rgba(139, 105, 20, 0.6);
   border-radius: 6px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: #fff;
-  font-size: 11px;
-  text-align: center;
+  font-size: 22px;
+  position: relative;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
 }
 
-.toolbar-slot.active {
+.actionbar-slot.active {
   border-color: #ffcc00;
   background: rgba(255, 204, 0, 0.15);
 }
+
+.actionbar-slot.drag-over {
+  border-color: #44ccff;
+  background: rgba(68, 204, 255, 0.15);
+}
+
+.actionbar-slot .keybind {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+}
+
+.actionbar-slot .slot-qty {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 10px;
+  color: #fff;
+  text-shadow: 0 0 3px #000;
+}
+
+/* ═══════════════════════════════════════════
+   BACKPACK — 30-slot inventory modal (6×5)
+   ═══════════════════════════════════════════ */
+
+.backpack-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.backpack-panel {
+  background: rgba(20, 15, 10, 0.95);
+  border: 2px solid #8b6914;
+  border-radius: 12px;
+  padding: 16px;
+  color: #fff;
+  min-width: 340px;
+}
+
+.backpack-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.backpack-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.backpack-close {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 8px;
+}
+
+.backpack-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.backpack-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 52px);
+  gap: 4px;
+}
+
+.backpack-slot {
+  width: 52px;
+  height: 52px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  font-size: 22px;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.backpack-slot:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.backpack-slot.dragging {
+  opacity: 0.5;
+}
+
+.backpack-slot .slot-qty {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  font-size: 10px;
+  color: #fff;
+  text-shadow: 0 0 3px #000;
+}
+
+.backpack-slot .quality-star {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 10px;
+}
+
+.backpack-slot.quality-silver {
+  border-color: #c0c0c0;
+  box-shadow: inset 0 0 6px rgba(192, 192, 192, 0.4);
+}
+
+.backpack-slot.quality-gold {
+  border-color: #ffd700;
+  box-shadow: inset 0 0 6px rgba(255, 215, 0, 0.4);
+}
+
+.backpack-slot.quality-iridium {
+  border-color: #b366ff;
+  box-shadow: inset 0 0 6px rgba(179, 102, 255, 0.4);
+}
+
+/* ═══════════════════════════════════════════
+   DIALOGUE
+   ═══════════════════════════════════════════ */
 
 #dialogue-panel {
   bottom: 80px;
@@ -194,7 +290,113 @@ body {
   border-color: #ffcc00;
 }
 
-/* Debug Window */
+/* ═══════════════════════════════════════════
+   CRAFTING PANEL
+   ═══════════════════════════════════════════ */
+
+#crafting-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(420px, 90vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  z-index: 15;
+  pointer-events: auto;
+}
+
+.craft-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding-bottom: 8px;
+}
+
+.craft-title {
+  font-weight: bold;
+  color: #ffcc00;
+  font-size: 16px;
+}
+
+.craft-close {
+  cursor: pointer;
+  color: #aaa;
+  font-size: 16px;
+  padding: 2px 6px;
+}
+
+.craft-close:hover {
+  color: #fff;
+}
+
+.craft-status {
+  padding: 12px;
+  text-align: center;
+  color: #ffcc00;
+}
+
+.craft-empty {
+  padding: 12px;
+  text-align: center;
+  color: #888;
+}
+
+.craft-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.craft-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+
+.craft-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.craft-btn {
+  background: rgba(255, 204, 0, 0.2);
+  border: 1px solid #ffcc00;
+  border-radius: 6px;
+  color: #ffcc00;
+  cursor: pointer;
+  padding: 6px 14px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.craft-btn:hover {
+  background: rgba(255, 204, 0, 0.35);
+}
+
+/* ═══════════════════════════════════════════
+   PROFESSION CHOICE PANEL
+   ═══════════════════════════════════════════ */
+
+#profession-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(500px, 90vw);
+  z-index: 20;
+  pointer-events: auto;
+}
+
+/* ═══════════════════════════════════════════
+   DEBUG WINDOW
+   ═══════════════════════════════════════════ */
+
 #debug-window {
   position: absolute;
   top: 50px;
@@ -363,10 +565,14 @@ body {
 }
 
 @media (max-width: 600px) {
-  .inventory-grid {
-    grid-template-columns: repeat(5, 44px);
+  .backpack-grid {
+    grid-template-columns: repeat(5, 46px);
   }
-  .toolbar-slot {
+  .backpack-slot {
+    width: 46px;
+    height: 46px;
+  }
+  .actionbar-slot {
     width: 44px;
     height: 44px;
   }

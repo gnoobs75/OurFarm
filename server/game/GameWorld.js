@@ -1,12 +1,14 @@
 // server/game/GameWorld.js
 // The master game world — owns all state, runs the tick loop,
 // processes player actions, and broadcasts updates.
+// Supports multiple maps (farm, town) with portal transitions.
 
 import { v4 as uuid } from 'uuid';
-import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES } from '../../shared/constants.js';
+import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA, FERTILIZER_DATA, FORAGE_ITEMS, PROFESSIONS } from '../../shared/constants.js';
 import { isValidTile, tileIndex } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { DecorationGenerator } from './DecorationGenerator.js';
+import { MapInstance } from './MapInstance.js';
 import { TimeManager } from './TimeManager.js';
 import { WeatherManager } from './WeatherManager.js';
 import { Player } from '../entities/Player.js';
@@ -14,7 +16,10 @@ import { Crop } from '../entities/Crop.js';
 import { NPC } from '../entities/NPC.js';
 import { Pet } from '../entities/Pet.js';
 import { Animal } from '../entities/Animal.js';
+import { Sprinkler } from '../entities/Sprinkler.js';
+import { Machine } from '../entities/Machine.js';
 import { FishCalculator } from '../entities/Fish.js';
+import { ForagingSystem } from './ForagingSystem.js';
 import { getDB } from '../db/database.js';
 import { logger } from '../utils/Logger.js';
 
@@ -31,6 +36,7 @@ const animalsData = JSON.parse(readFileSync(join(dataDir, 'animals.json'), 'utf-
 const npcsData = JSON.parse(readFileSync(join(dataDir, 'npcs.json'), 'utf-8'));
 const fishData = JSON.parse(readFileSync(join(dataDir, 'fish.json'), 'utf-8'));
 const recipesData = JSON.parse(readFileSync(join(dataDir, 'recipes.json'), 'utf-8'));
+const machinesData = JSON.parse(readFileSync(join(dataDir, 'machines.json'), 'utf-8'));
 
 export class GameWorld {
   constructor(io) {
@@ -40,50 +46,102 @@ export class GameWorld {
     // Generate or load world
     const seed = this._getOrCreateSeed();
     this.terrainGen = new TerrainGenerator(seed);
-    this.tiles = this.terrainGen.generate();
     this.decorationGen = new DecorationGenerator(seed);
-    this.decorations = this.decorationGen.generate(this.tiles);
     this.time = new TimeManager();
     this.weather = new WeatherManager(seed);
     this.fishCalc = new FishCalculator(fishData);
 
     // Entity collections
     this.players = new Map();    // socketId -> Player
-    this.crops = new Map();      // id -> Crop
-    this.animals = new Map();    // id -> Animal
-    this.pets = new Map();       // id -> Pet
-    this.npcs = npcsData.map(d => new NPC(d));
-    this.buildings = new Map();
     this.shippingBins = new Map(); // playerId -> [{itemId, quantity, quality}]
 
-    // Set up starter farm (buildings + crops) on first run
+    // Multi-map setup
+    this.maps = new Map();
+    this._initMaps();
     this._initStarterFarm();
+
+    // Foraging systems (one per map)
+    this.farmForaging = new ForagingSystem();
+    this.townForaging = new ForagingSystem();
 
     // Start tick loop
     this._tickInterval = null;
     this._lastTick = Date.now();
   }
 
+  _initMaps() {
+    // Farm map
+    const farmTiles = this.terrainGen.generate();
+    const farmDecorations = this.decorationGen.generate(farmTiles);
+    const farmMap = new MapInstance(MAP_IDS.FARM, {
+      tiles: farmTiles,
+      decorations: farmDecorations,
+      portals: [
+        // South edge portal → town (north edge)
+        { x: 29, z: 61, width: 6, height: 3, targetMap: MAP_IDS.TOWN, spawnX: 31, spawnZ: 3 },
+      ],
+    });
+    this.maps.set(MAP_IDS.FARM, farmMap);
+
+    // Town map
+    const townTiles = this.terrainGen.generateTown();
+    const townDecorations = this.decorationGen.generateTown(townTiles);
+    const townMap = new MapInstance(MAP_IDS.TOWN, {
+      tiles: townTiles,
+      decorations: townDecorations,
+      portals: [
+        // North edge portal → farm (near portal path)
+        { x: 30, z: 0, width: 4, height: 2, targetMap: MAP_IDS.FARM, spawnX: 31, spawnZ: 58 },
+      ],
+    });
+
+    // NPCs live on the town map
+    townMap.npcs = npcsData.map(d => new NPC(d));
+
+    // Town buildings: spread across the layout
+    const townBuildings = [
+      { id: 'bakery', type: 'shop', tileX: 10, tileZ: 12 },
+      { id: 'smithy', type: 'shop', tileX: 45, tileZ: 30 },
+      { id: 'library', type: 'house', tileX: 27, tileZ: 14 },
+      { id: 'fish_shop', type: 'shop', tileX: 53, tileZ: 22 },
+      { id: 'town_hall', type: 'house', tileX: 31, tileZ: 32 },
+      { id: 'vet_clinic', type: 'house', tileX: 11, tileZ: 22 },
+    ];
+    for (const b of townBuildings) {
+      townMap.buildings.set(b.id, b);
+    }
+
+    this.maps.set(MAP_IDS.TOWN, townMap);
+  }
+
   _initStarterFarm() {
-    // Only populate if buildings map is empty (first boot)
-    if (this.buildings.size > 0) return;
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    if (farmMap.buildings.size > 0) return;
 
     const cx = 32, cz = 32;
 
-    // Place house and barn
-    this.buildings.set('house_main', {
+    // Farm buildings
+    farmMap.buildings.set('house_main', {
       id: 'house_main', type: 'house', tileX: cx - 3, tileZ: cz - 1,
     });
-    this.buildings.set('barn_main', {
+    farmMap.buildings.set('barn_main', {
       id: 'barn_main', type: 'barn', tileX: cx - 4, tileZ: cz + 3,
+    });
+    farmMap.buildings.set('farm_mill', {
+      id: 'farm_mill', type: 'mill', tileX: 38, tileZ: 31,
+      processing: null,
+    });
+    farmMap.buildings.set('farm_forge', {
+      id: 'farm_forge', type: 'forge', tileX: 38, tileZ: 34,
+      processing: null,
     });
 
     // Pre-till a crop plot
     for (let px = cx + 2; px <= cx + 6; px++) {
       for (let pz = cz - 2; pz <= cz + 2; pz++) {
         const idx = tileIndex(px, pz);
-        if (idx >= 0 && idx < this.tiles.length) {
-          this.tiles[idx].type = TILE_TYPES.TILLED;
+        if (idx >= 0 && idx < farmMap.tiles.length) {
+          farmMap.tiles[idx].type = TILE_TYPES.TILLED;
         }
       }
     }
@@ -92,31 +150,35 @@ export class GameWorld {
     for (let px = cx + 2; px <= cx + 5; px++) {
       for (let pz = cz - 1; pz <= cz + 1; pz++) {
         const crop = new Crop({ tileX: px, tileZ: pz, cropType: 'parsnip' });
-        crop.stage = 1 + ((px + pz) % 3); // stages 1, 2, 3
-        this.crops.set(crop.id, crop);
+        crop.stage = 1 + ((px + pz) % 3);
+        farmMap.crops.set(crop.id, crop);
       }
     }
 
+    // Shipping bin on farm
+    farmMap.buildings.set('shipping_bin', {
+      id: 'shipping_bin', type: 'shipping_bin', tileX: 30, tileZ: 32,
+    });
 
-    // Place town buildings
-    const townBuildings = [
-      { id: 'bakery',         type: 'bakery',       tileX: 26, tileZ: 7 },
-      { id: 'blacksmith',     type: 'blacksmith',    tileX: 36, tileZ: 7 },
-      { id: 'library',        type: 'library',       tileX: 31, tileZ: 5 },
-      { id: 'town_hall',      type: 'town_hall',     tileX: 34, tileZ: 4 },
-      { id: 'vet_clinic',     type: 'vet_clinic',    tileX: 26, tileZ: 11 },
-      { id: 'fishing_hut',    type: 'fishing_hut',   tileX: 44, tileZ: 10 },
-      { id: 'general_store',  type: 'shop',          tileX: 40, tileZ: 7 },
-      { id: 'shipping_bin',   type: 'shipping_bin',  tileX: 30, tileZ: 32 },
+    // Spawn starter animals
+    const starterAnimals = [
+      { type: 'chicken', x: 27, z: 35 },
+      { type: 'chicken', x: 28, z: 36 },
+      { type: 'cow', x: 26, z: 38 },
     ];
-    for (const b of townBuildings) {
-      this.buildings.set(b.id, b);
+    for (const a of starterAnimals) {
+      const animal = new Animal(a);
+      farmMap.animals.set(animal.id, animal);
     }
 
+    // Spawn starter pet
+    const starterPet = new Pet({ ownerId: null, type: 'dog', name: 'Buddy', x: 30, z: 31 });
+    farmMap.pets.set(starterPet.id, starterPet);
+
     logger.info('WORLD', 'Starter farm initialized', {
-      buildings: this.buildings.size,
-      crops: this.crops.size,
-      decorations: this.decorations.length,
+      farmBuildings: farmMap.buildings.size,
+      farmCrops: farmMap.crops.size,
+      farmAnimals: farmMap.animals.size,
     });
   }
 
@@ -129,13 +191,23 @@ export class GameWorld {
       logger.info('WORLD', `New world created with seed ${seed}`);
       return seed;
     }
-    // Restore time state
     this.time = new TimeManager({ season: row.season, day: row.day, hour: row.hour });
     logger.info('WORLD', `Loaded existing world`, { seed: row.seed, season: row.season, day: row.day, hour: row.hour });
     return row.seed;
   }
 
+  /** Get the MapInstance for a player */
+  _getPlayerMap(player) {
+    return this.maps.get(player.currentMap) || this.maps.get(MAP_IDS.FARM);
+  }
+
   start() {
+    // Spawn initial forage items
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const townMap = this.maps.get(MAP_IDS.TOWN);
+    this.farmForaging.spawnDaily(farmMap.tiles, this.time.season, 6);
+    this.townForaging.spawnDaily(townMap.tiles, this.time.season, 4);
+
     logger.info('WORLD', `GameWorld started. Tick rate: ${TICK_RATE}`);
     this._tickInterval = setInterval(() => this._tick(), 1000 / TICK_RATE);
   }
@@ -151,42 +223,38 @@ export class GameWorld {
     const deltaSec = (now - this._lastTick) / 1000;
     this._lastTick = now;
 
-    // Pause if no players
     if (this.players.size === 0) return;
 
-    // Advance time
     const timeEvents = this.time.tick(deltaSec);
-
-    // Check for 2 AM collapse
     this._checkCollapse();
 
-    // Calculate game hours elapsed this tick
     const gameHoursElapsed = (deltaSec * TIME_SCALE) / 3600;
 
-    // Process time events
     for (const event of timeEvents) {
-      if (event.type === 'newDay') {
-        this._onNewDay();
-      }
-      if (event.type === 'newSeason') {
-        this._onNewSeason(event.season);
-      }
+      if (event.type === 'newDay') this._onNewDay();
+      if (event.type === 'newSeason') this._onNewSeason(event.season);
     }
 
-    // Update crops
-    for (const crop of this.crops.values()) {
+    // Update crops on farm map
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    for (const crop of farmMap.crops.values()) {
       const data = cropsData[crop.cropType];
-      if (data) {
-        crop.tick(gameHoursElapsed, data);
-      }
+      if (data) crop.tick(gameHoursElapsed, data);
     }
 
-    // Update NPC schedules
-    for (const npc of this.npcs) {
+    // Animal product timers
+    for (const animal of farmMap.animals.values()) {
+      const animalData = animalsData[animal.type];
+      if (animalData) animal.tickHour(animalData, gameHoursElapsed);
+    }
+
+    // Update NPC schedules on town map
+    const townMap = this.maps.get(MAP_IDS.TOWN);
+    for (const npc of townMap.npcs) {
       npc.updateSchedule(this.time.hour);
     }
 
-    // Broadcast time update (every ~1 second real-time)
+    // Broadcast time update (~1 second real-time)
     if (Math.floor(now / 1000) !== Math.floor((now - deltaSec * 1000) / 1000)) {
       this.io.emit(ACTIONS.TIME_UPDATE, this.time.getState());
     }
@@ -194,22 +262,17 @@ export class GameWorld {
 
   _checkCollapse() {
     const hour = this.time.hour;
-    // 2 AM check — only trigger once when crossing the threshold
     if (hour >= 2 && hour < 6) {
       for (const player of this.players.values()) {
         if (!player._collapsed) {
           player._collapsed = true;
-          // Penalty: lose 10% coins (max 1000)
           const penalty = Math.min(Math.floor(player.coins * 0.1), 1000);
           player.coins -= penalty;
-          // Wake with 50% energy
           player.energy = Math.floor(player.maxEnergy * 0.5);
           this._sendInventoryUpdate(player.socketId, player);
-          // Broadcast collapse event to the specific player
           if (this.io && player.socketId) {
             this.io.to(player.socketId).emit(ACTIONS.WORLD_UPDATE, {
-              type: 'playerCollapse',
-              penalty,
+              type: 'playerCollapse', penalty,
             });
           }
         }
@@ -218,77 +281,84 @@ export class GameWorld {
   }
 
   _onNewDay() {
-    // Reset collapse flag for all players
     for (const player of this.players.values()) {
       player._collapsed = false;
     }
 
-    // Process shipping bins — pay players for items shipped yesterday
+    // Reset NPC daily flags
+    const db = getDB();
+    db.prepare('UPDATE npc_relationships SET talked_today = 0, gifted_today = 0').run();
+
     this._processShippingBins();
 
     logger.info('WORLD', `New day: Season ${this.time.season}, Day ${this.time.day}`, {
-      crops: this.crops.size, animals: this.animals.size, players: this.players.size,
+      crops: this.maps.get(MAP_IDS.FARM).crops.size,
+      players: this.players.size,
     });
 
-    // Weather change
     const newWeather = this.weather.onNewDay(this.time.season);
-    logger.debug('WORLD', `Weather changed to ${newWeather}`);
     this.io.emit(ACTIONS.WEATHER_UPDATE, { weather: newWeather });
 
-    // Rain waters all crops
+    // Spawn daily forage items
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const townMap = this.maps.get(MAP_IDS.TOWN);
+    this.farmForaging.spawnDaily(farmMap.tiles, this.time.season, 6);
+    this.townForaging.spawnDaily(townMap.tiles, this.time.season, 4);
+
+    // Sprinklers auto-water crops at dawn
+    for (const sprinkler of farmMap.sprinklers.values()) {
+      const wateredTiles = sprinkler.getWateredTiles();
+      for (const t of wateredTiles) {
+        for (const crop of farmMap.crops.values()) {
+          if (crop.tileX === t.x && crop.tileZ === t.z) {
+            crop.watered = true;
+          }
+        }
+      }
+    }
+
+    // Rain waters all crops on farm
     if (this.weather.isRaining()) {
-      for (const crop of this.crops.values()) {
+      for (const crop of farmMap.crops.values()) {
         crop.watered = true;
       }
     }
 
-    // Animal daily tick
-    for (const animal of this.animals.values()) {
-      animal.tickDaily();
-    }
-
-    // Pet daily tick
-    for (const pet of this.pets.values()) {
-      pet.tickDaily();
-    }
+    // Animal/pet daily ticks (on farm map)
+    for (const animal of farmMap.animals.values()) animal.tickDaily();
+    for (const pet of farmMap.pets.values()) pet.tickDaily();
 
     // Restore player energy
     for (const player of this.players.values()) {
       player.energy = player.maxEnergy;
     }
 
-    // Save skills for all online players
+    // Save skills
     for (const player of this.players.values()) {
       this._savePlayerSkills(player);
     }
 
-    // Save state
     this._saveWorldState();
-
-    // Broadcast full update
     this._broadcastWorldUpdate();
   }
 
   _onNewSeason(season) {
     logger.info('WORLD', `New season: ${season}`);
-    this._onSeasonChange(season);
-  }
-
-  _onSeasonChange(newSeason) {
+    const farmMap = this.maps.get(MAP_IDS.FARM);
     const toRemove = [];
-    for (const [id, crop] of this.crops) {
+    for (const [id, crop] of farmMap.crops) {
       const cropData = cropsData[crop.cropType];
-      if (cropData && !cropData.season.includes(newSeason)) {
+      if (cropData && !cropData.season.includes(season)) {
         toRemove.push(id);
       }
     }
     for (const id of toRemove) {
-      const crop = this.crops.get(id);
+      const crop = farmMap.crops.get(id);
       const idx = tileIndex(crop.tileX, crop.tileZ);
-      if (idx >= 0 && idx < this.tiles.length) {
-        this.tiles[idx].type = TILE_TYPES.TILLED;
+      if (idx >= 0 && idx < farmMap.tiles.length) {
+        farmMap.tiles[idx].type = TILE_TYPES.TILLED;
       }
-      this.crops.delete(id);
+      farmMap.crops.delete(id);
     }
     if (toRemove.length > 0) {
       logger.info('WORLD', `Season change: ${toRemove.length} crops died`);
@@ -299,7 +369,6 @@ export class GameWorld {
   // --- Player Actions ---
 
   handlePlayerJoin(socket, data) {
-    // Load or create persistent player in database
     const db = getDB();
     const playerId = data.playerId || uuid();
     let row = db.prepare('SELECT * FROM players WHERE id = ?').get(playerId);
@@ -309,23 +378,29 @@ export class GameWorld {
       row = { id: playerId, name: data.name || 'Farmer' };
     }
 
-    // Load saved skills from database
     const skills = this._loadPlayerSkills(playerId);
-
-    const player = new Player({ id: playerId, name: data.name || row.name, skills });
+    const professions = row.professions ? JSON.parse(row.professions) : {};
+    const player = new Player({ id: playerId, name: data.name || row.name, skills, professions });
     player.socketId = socket.id;
     this.players.set(socket.id, player);
 
-    // Send full world state to joining player
-    const fullState = this._getFullState(player.id);
+    // Assign unowned pet to this player
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    for (const pet of farmMap.pets.values()) {
+      if (!pet.ownerId) {
+        pet.ownerId = player.id;
+        break;
+      }
+    }
+
+    const fullState = this._getFullState(player);
     socket.emit(ACTIONS.WORLD_STATE, fullState);
 
-    // Notify others
-    socket.broadcast.emit(ACTIONS.PLAYER_JOIN, { player: player.getState() });
+    // Notify other players on same map
+    this._broadcastToMap(player.currentMap, ACTIONS.PLAYER_JOIN, { player: player.getState() }, socket.id);
 
     logger.info('GAME', `${player.name} joined`, {
       socketId: socket.id, playerId: player.id, online: this.players.size,
-      stateSent: { tiles: fullState.tiles.length, crops: fullState.crops.length, npcs: fullState.npcs.length },
     });
   }
 
@@ -333,9 +408,7 @@ export class GameWorld {
     const player = this.players.get(socketId);
     if (!player) return;
 
-    // Save skills before removing
     this._savePlayerSkills(player);
-
     logger.info('GAME', `${player.name} left`, { playerId: player.id, online: this.players.size - 1 });
     this.players.delete(socketId);
     this.io.emit(ACTIONS.PLAYER_LEAVE, { playerId: player.id });
@@ -346,81 +419,114 @@ export class GameWorld {
     if (!player) return;
     player.x = data.x;
     player.z = data.z;
-    this.io.emit(ACTIONS.WORLD_UPDATE, {
-      type: 'playerMove',
-      playerId: player.id,
-      x: player.x, z: player.z,
+
+    // Check for portal zone
+    const map = this._getPlayerMap(player);
+    const tileX = Math.floor(data.x);
+    const tileZ = Math.floor(data.z);
+    const portal = map.isInPortalZone(tileX, tileZ);
+    if (portal) {
+      this._handleMapTransition(socketId, portal);
+      return;
+    }
+
+    this._broadcastToMap(player.currentMap, ACTIONS.WORLD_UPDATE, {
+      type: 'playerMove', playerId: player.id, x: player.x, z: player.z,
     });
+  }
+
+  _handleMapTransition(socketId, portal) {
+    const player = this.players.get(socketId);
+    if (!player) return;
+
+    const oldMap = player.currentMap;
+    const newMap = portal.targetMap;
+
+    player.currentMap = newMap;
+    player.x = portal.spawnX;
+    player.z = portal.spawnZ;
+
+    // Notify players on old map that this player left
+    this._broadcastToMap(oldMap, ACTIONS.PLAYER_LEAVE, { playerId: player.id }, socketId);
+
+    // Send the new map state to this player
+    const targetMap = this.maps.get(newMap);
+    const mapState = targetMap.getFullState();
+
+    const forageItems = newMap === MAP_IDS.FARM
+      ? this.farmForaging.getState()
+      : this.townForaging.getState();
+
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'mapTransition',
+      mapId: newMap,
+      mapState,
+      spawnX: portal.spawnX,
+      spawnZ: portal.spawnZ,
+      season: this.time.season,
+      forageItems,
+    });
+
+    // Notify players on new map that this player joined
+    this._broadcastToMap(newMap, ACTIONS.PLAYER_JOIN, { player: player.getState() }, socketId);
+
+    logger.info('GAME', `${player.name} transitioned ${oldMap} → ${newMap}`);
   }
 
   handleTill(socketId, data) {
     const player = this.players.get(socketId);
-    if (!player || !player.useEnergy(2)) {
-      logger.debug('FARM', `Till rejected: no player or no energy`, { socketId, data });
-      return;
-    }
-    if (!isValidTile(data.x, data.z)) {
-      logger.debug('FARM', `Till rejected: invalid tile`, data);
-      return;
-    }
+    if (!player) return;
+    const energyCost = TOOL_ENERGY_COST.hoe[player.toolTiers?.hoe || 0] || 2;
+    if (!player.useEnergy(energyCost)) return;
+    if (player.currentMap !== MAP_IDS.FARM) return; // only on farm
+    if (!isValidTile(data.x, data.z)) return;
 
+    const farmMap = this.maps.get(MAP_IDS.FARM);
     const idx = tileIndex(data.x, data.z);
-    const tile = this.tiles[idx];
-    if (tile.type !== TILE_TYPES.DIRT && tile.type !== TILE_TYPES.GRASS) {
-      logger.debug('FARM', `Till rejected: tile type ${tile.type} not tillable`, data);
-      return;
-    }
+    const tile = farmMap.tiles[idx];
+    if (tile.type !== TILE_TYPES.DIRT && tile.type !== TILE_TYPES.GRASS) return;
 
     tile.type = TILE_TYPES.TILLED;
-    logger.debug('FARM', `Tilled (${data.x},${data.z}) by ${player.name}`);
-    this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'tileChange', x: data.x, z: data.z, tileType: TILE_TYPES.TILLED });
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'tileChange', x: data.x, z: data.z, tileType: TILE_TYPES.TILLED,
+    });
   }
 
   handlePlant(socketId, data) {
     const player = this.players.get(socketId);
-    if (!player) return;
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
 
     const seedId = data.cropType + '_seed';
-    if (!player.hasItem(seedId)) {
-      logger.debug('FARM', `Plant rejected: ${player.name} missing ${seedId}`, { inventory: player.inventory });
-      return;
-    }
-    if (!isValidTile(data.x, data.z)) {
-      logger.debug('FARM', `Plant rejected: invalid tile`, data);
-      return;
-    }
+    if (!player.hasItem(seedId)) return;
+    if (!isValidTile(data.x, data.z)) return;
 
+    const farmMap = this.maps.get(MAP_IDS.FARM);
     const idx = tileIndex(data.x, data.z);
-    if (this.tiles[idx].type !== TILE_TYPES.TILLED) {
-      logger.debug('FARM', `Plant rejected: tile not tilled (type=${this.tiles[idx].type})`, data);
-      return;
-    }
+    if (farmMap.tiles[idx].type !== TILE_TYPES.TILLED) return;
 
-    // Check no crop already there
-    for (const crop of this.crops.values()) {
-      if (crop.tileX === data.x && crop.tileZ === data.z) {
-        logger.debug('FARM', `Plant rejected: crop already at (${data.x},${data.z})`);
-        return;
-      }
+    for (const crop of farmMap.crops.values()) {
+      if (crop.tileX === data.x && crop.tileZ === data.z) return;
     }
 
     player.removeItem(seedId, 1);
     const crop = new Crop({ tileX: data.x, tileZ: data.z, cropType: data.cropType });
-    this.crops.set(crop.id, crop);
+    farmMap.crops.set(crop.id, crop);
 
-    logger.debug('FARM', `${player.name} planted ${data.cropType} at (${data.x},${data.z})`, { cropId: crop.id });
-    this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'cropPlanted', crop: crop.getState() });
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, { type: 'cropPlanted', crop: crop.getState() });
     this._sendInventoryUpdate(socketId, player);
   }
 
   handleWater(socketId, data) {
     const player = this.players.get(socketId);
-    if (!player || !player.useEnergy(1)) return;
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    const energyCost = TOOL_ENERGY_COST.watering_can[player.toolTiers?.watering_can || 0] || 1;
+    if (!player.useEnergy(energyCost)) return;
 
-    for (const crop of this.crops.values()) {
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    for (const crop of farmMap.crops.values()) {
       if (crop.tileX === data.x && crop.tileZ === data.z) {
         crop.watered = true;
-        this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'cropWatered', cropId: crop.id });
+        this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, { type: 'cropWatered', cropId: crop.id });
         break;
       }
     }
@@ -428,34 +534,34 @@ export class GameWorld {
 
   handleHarvest(socketId, data) {
     const player = this.players.get(socketId);
-    if (!player) return;
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    const energyCost = TOOL_ENERGY_COST.pickaxe[player.toolTiers?.pickaxe || 0] || 3;
+    if (!player.useEnergy(energyCost)) return;
 
-    for (const [id, crop] of this.crops.entries()) {
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    for (const [id, crop] of farmMap.crops.entries()) {
       if (crop.tileX === data.x && crop.tileZ === data.z && crop.stage >= 3) {
         const cropData = cropsData[crop.cropType];
         if (!cropData) continue;
 
         const yield_ = 1 + Math.floor(Math.random() * 2);
-        const quality = this._rollCropQuality(player.getSkillLevel(SKILLS.FARMING));
+        const quality = this._rollCropQuality(player.getSkillLevel(SKILLS.FARMING), crop.fertilizer);
         player.addItem(crop.cropType, yield_, quality);
         player.addSkillXP(SKILLS.FARMING, cropData.xp);
-
-        logger.debug('FARM', `${player.name} harvested ${crop.cropType} x${yield_} at (${data.x},${data.z})`, {
-          xp: cropData.xp, farmingXP: player.skills.farming.xp, level: player.level, regrows: !!cropData.regrows,
-        });
+        this._checkPendingProfession(socketId, player);
 
         if (cropData.regrows) {
-          // Regrowable: reset to mature stage, will grow back to harvestable
           crop.stage = CROP_STAGES.MATURE;
           crop.growth = 0;
           crop.watered = false;
-          this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'cropUpdate', crop: crop.getState() });
+          this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, { type: 'cropUpdate', crop: crop.getState() });
         } else {
-          // Non-regrowable: remove crop, reset tile
-          this.crops.delete(id);
+          farmMap.crops.delete(id);
           const idx = tileIndex(data.x, data.z);
-          this.tiles[idx].type = TILE_TYPES.TILLED;
-          this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'cropHarvested', cropId: id, x: data.x, z: data.z });
+          farmMap.tiles[idx].type = TILE_TYPES.TILLED;
+          this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+            type: 'cropHarvested', cropId: id, x: data.x, z: data.z,
+          });
         }
 
         this._sendInventoryUpdate(socketId, player);
@@ -466,18 +572,12 @@ export class GameWorld {
 
   handleFishCast(socketId, data) {
     const player = this.players.get(socketId);
-    if (!player || !player.useEnergy(5)) {
-      logger.debug('FISH', `Cast rejected: no player or no energy`, { socketId });
-      return;
-    }
+    if (!player || !player.useEnergy(5)) return;
 
-    // Determine location by tile type
+    const map = this._getPlayerMap(player);
     const idx = tileIndex(Math.floor(data.x), Math.floor(data.z));
-    if (idx < 0 || idx >= this.tiles.length) return;
-    if (this.tiles[idx].type !== TILE_TYPES.WATER) {
-      logger.debug('FISH', `Cast rejected: not water tile at (${data.x},${data.z}), type=${this.tiles[idx]?.type}`);
-      return;
-    }
+    if (idx < 0 || idx >= map.tiles.length) return;
+    if (map.tiles[idx].type !== TILE_TYPES.WATER) return;
 
     // Phase 1: Send cast confirmation with bobber position
     this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
@@ -510,6 +610,7 @@ export class GameWorld {
         if (fish) {
           player.addItem(fish.id, 1);
           player.addSkillXP(SKILLS.FISHING, 5 + fish.rarity * 10);
+          this._checkPendingProfession(socketId, player);
           logger.debug('FISH', `${player.name} caught ${fish.id} (rarity ${fish.rarity})`);
           this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
             type: 'fishCaught', playerId: player.id, fish,
@@ -530,13 +631,13 @@ export class GameWorld {
     const player = this.players.get(socketId);
     if (!player) return;
 
-    const npc = this.npcs.find(n => n.id === data.npcId);
-    if (!npc) {
-      logger.warn('NPC', `NPC not found: ${data.npcId}`);
-      return;
-    }
+    // NPCs only on town map
+    if (player.currentMap !== MAP_IDS.TOWN) return;
 
-    // Get or create relationship
+    const townMap = this.maps.get(MAP_IDS.TOWN);
+    const npc = townMap.npcs.find(n => n.id === data.npcId);
+    if (!npc) return;
+
     const db = getDB();
     let rel = db.prepare('SELECT * FROM npc_relationships WHERE player_id = ? AND npc_id = ?')
       .get(player.id, npc.id);
@@ -547,7 +648,6 @@ export class GameWorld {
       rel = { hearts: 0, talked_today: 0 };
     }
 
-    // Talking gives +0.2 hearts per day (once)
     if (!rel.talked_today) {
       db.prepare('UPDATE npc_relationships SET hearts = MIN(hearts + 0.2, 10), talked_today = 1 WHERE player_id = ? AND npc_id = ?')
         .run(player.id, npc.id);
@@ -556,15 +656,259 @@ export class GameWorld {
 
     const dialogue = npc.getDialogue(rel.hearts);
     const shopItems = this._getShopItems(npc);
+    const emitData = {
+      type: 'npcDialogue', npcId: npc.id, npcName: npc.name, npcRole: npc.role,
+      text: dialogue, hearts: rel.hearts, shopItems,
+    };
+
+    // Include upgrade options for Blacksmith
+    if (npc.role === 'Blacksmith') {
+      const upgradeOptions = {};
+      for (const [tool, tier] of Object.entries(player.toolTiers)) {
+        if (tier < TOOL_TIERS.IRIDIUM) {
+          const cost = TOOL_UPGRADE_COST[tier + 1];
+          upgradeOptions[tool] = { currentTier: tier, nextTier: tier + 1, ...cost };
+        }
+      }
+      emitData.upgradeOptions = upgradeOptions;
+    }
+
     logger.debug('NPC', `${player.name} talked to ${npc.name}`, { hearts: rel.hearts });
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, emitData);
+  }
+
+  handleNPCGift(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player) return;
+
+    // NPCs only on town map
+    if (player.currentMap !== MAP_IDS.TOWN) return;
+
+    // Check player has the item
+    if (!player.hasItem(data.itemId)) return;
+
+    const townMap = this.maps.get(MAP_IDS.TOWN);
+    const npc = townMap.npcs.find(n => n.id === data.npcId);
+    if (!npc) return;
+
+    const db = getDB();
+    let rel = db.prepare('SELECT * FROM npc_relationships WHERE player_id = ? AND npc_id = ?')
+      .get(player.id, npc.id);
+
+    if (!rel) {
+      db.prepare('INSERT INTO npc_relationships (player_id, npc_id) VALUES (?, ?)')
+        .run(player.id, npc.id);
+      rel = { hearts: 0, talked_today: 0, gifted_today: 0 };
+    }
+
+    // Check if already gifted today
+    if (rel.gifted_today) {
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+        type: 'npcDialogue', npcId: npc.id, npcName: npc.name,
+        text: `${npc.name} has already received a gift today.`, hearts: rel.hearts,
+      });
+      return;
+    }
+
+    // Determine preference tier
+    const npcData = npcsData.find(n => n.id === npc.id);
+    let points = GIFT_POINTS.NEUTRAL;
+    let tier = 'NEUTRAL';
+
+    if (npcData.lovedGifts && npcData.lovedGifts.includes(data.itemId)) {
+      points = GIFT_POINTS.LOVED;
+      tier = 'LOVED';
+    } else if (npcData.likedGifts && npcData.likedGifts.includes(data.itemId)) {
+      points = GIFT_POINTS.LIKED;
+      tier = 'LIKED';
+    } else if (npcData.hatedGifts && npcData.hatedGifts.includes(data.itemId)) {
+      points = GIFT_POINTS.HATED;
+      tier = 'HATED';
+    }
+
+    // Convert points to hearts (250 points = 1 heart, max 10)
+    const heartGain = points / 250;
+    const newHearts = Math.max(0, Math.min(10, rel.hearts + heartGain));
+
+    // Remove item from player inventory
+    player.removeItem(data.itemId, 1);
+
+    // Update DB
+    db.prepare('UPDATE npc_relationships SET hearts = ?, gifted_today = 1 WHERE player_id = ? AND npc_id = ?')
+      .run(newHearts, player.id, npc.id);
+
+    // Build response text based on tier
+    let responseText;
+    switch (tier) {
+      case 'LOVED':
+        responseText = `Oh my! I LOVE this! Thank you so much!`;
+        break;
+      case 'LIKED':
+        responseText = `Oh, how nice! I really like this. Thank you!`;
+        break;
+      case 'HATED':
+        responseText = `...Why would you give me this?`;
+        break;
+      default:
+        responseText = `Oh, a gift? That's thoughtful, thank you.`;
+        break;
+    }
+
     this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
-      type: 'npcDialogue',
-      npcId: npc.id,
-      npcName: npc.name,
-      npcRole: npc.role,
-      text: dialogue,
-      hearts: rel.hearts,
-      shopItems,
+      type: 'npcDialogue', npcId: npc.id, npcName: npc.name, text: responseText, hearts: newHearts,
+    });
+    this._sendInventoryUpdate(socketId, player);
+  }
+
+  handleAnimalFeed(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const animal = farmMap.animals.get(data.animalId);
+    if (!animal) return;
+
+    animal.feed();
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'animalUpdate', animal: animal.getState(),
+    });
+  }
+
+  handleAnimalCollect(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const animal = farmMap.animals.get(data.animalId);
+    if (!animal || !animal.productReady) return;
+
+    const animalData = animalsData[animal.type];
+    if (!animalData) return;
+
+    const result = animal.collectProduct();
+    if (!result) return;
+
+    const quality = result.qualityBonus > 1 ? 1 : 0;
+    player.addItem(animalData.product, 1, quality);
+    player.addSkillXP(SKILLS.FARMING, 5);
+    this._checkPendingProfession(socketId, player);
+
+    this._sendInventoryUpdate(socketId, player);
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'animalUpdate', animal: animal.getState(),
+    });
+  }
+
+  handlePetInteract(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const pet = farmMap.pets.get(data.petId);
+    if (!pet || pet.ownerId !== player.id) return;
+
+    let message = '';
+    switch (data.action) {
+      case 'pet':
+        pet.pet();
+        message = `${pet.name || 'Pet'} wags happily!`;
+        break;
+      case 'feed':
+        pet.feed();
+        message = `${pet.name || 'Pet'} eats eagerly!`;
+        break;
+      case 'train':
+        if (pet.energy < 20) {
+          message = `${pet.name || 'Pet'} is too tired to train.`;
+          break;
+        }
+        pet.train();
+        message = `${pet.name || 'Pet'} learned something new!`;
+        break;
+      default:
+        return;
+    }
+
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'petUpdate', pet: pet.getState(), message,
+    });
+  }
+
+  handleCraftStart(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const building = farmMap.buildings.get(data.buildingId);
+    if (!building) return;
+    if (building.processing) {
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+        type: 'craftError', message: 'This machine is already processing.',
+      });
+      return;
+    }
+
+    const recipe = recipesData[data.recipeId];
+    if (!recipe || recipe.building !== building.type) return;
+
+    // Check player has all inputs
+    for (const [itemId, qty] of Object.entries(recipe.inputs)) {
+      if (!player.hasItem(itemId, qty)) {
+        this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+          type: 'craftError', message: `Need more ${itemId}.`,
+        });
+        return;
+      }
+    }
+
+    // Consume inputs
+    for (const [itemId, qty] of Object.entries(recipe.inputs)) {
+      player.removeItem(itemId, qty);
+    }
+
+    // Start processing (time in hours -> milliseconds)
+    const now = Date.now();
+    building.processing = {
+      recipeId: data.recipeId,
+      startTime: now,
+      endTime: now + recipe.time * 3600 * 1000,
+    };
+
+    this._sendInventoryUpdate(socketId, player);
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'craftStarted', buildingId: building.id, recipeId: data.recipeId,
+      endTime: building.processing.endTime,
+    });
+  }
+
+  handleCraftCollect(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const building = farmMap.buildings.get(data.buildingId);
+    if (!building || !building.processing) return;
+
+    if (Date.now() < building.processing.endTime) {
+      const remaining = Math.ceil((building.processing.endTime - Date.now()) / 60000);
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+        type: 'craftError', message: `Still processing. ${remaining} min left.`,
+      });
+      return;
+    }
+
+    const recipe = recipesData[building.processing.recipeId];
+    if (!recipe) return;
+
+    player.addItem(recipe.output, recipe.count || 1);
+    player.addSkillXP(SKILLS.FARMING, recipe.xp || 5);
+    this._checkPendingProfession(socketId, player);
+    building.processing = null;
+
+    this._sendInventoryUpdate(socketId, player);
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'craftCollected', buildingId: building.id,
+      itemId: recipe.output, quantity: recipe.count || 1,
     });
   }
 
@@ -603,7 +947,6 @@ export class GameWorld {
     const player = this.players.get(socketId);
     if (!player) return;
 
-    // Check if it's a crop seed
     const cropType = data.itemId.replace('_seed', '');
     const cropData = cropsData[cropType];
     if (cropData) {
@@ -623,23 +966,36 @@ export class GameWorld {
     if (!player.hasItem(data.itemId, quantity)) return;
 
     const cropData = cropsData[data.itemId];
-    let basePrice = cropData?.sellPrice || 10;
+    const fishItem = fishData[data.itemId];
+    let basePrice = cropData?.sellPrice || fishItem?.value || 10;
 
-    // Find the item slot to get quality
     const slot = player.inventory.find(i => i.itemId === data.itemId);
     const quality = slot?.quality || 0;
-    const price = Math.floor(basePrice * QUALITY_MULTIPLIER[quality]) * quantity;
+    let price = Math.floor(basePrice * QUALITY_MULTIPLIER[quality]) * quantity;
+
+    // Tiller profession: +10% crop sell value
+    if (cropData && player.hasProfession('tiller')) {
+      price = Math.floor(price * 1.1);
+    }
+
+    // Fisher/Angler profession: fish sell value bonus
+    if (fishItem) {
+      const fishBonus = player.getProfessionBonus('fishSellValue');
+      if (fishBonus > 0) {
+        price = Math.floor(price * (1 + fishBonus));
+      }
+    }
 
     player.removeItem(data.itemId, quantity, quality);
     player.coins += price;
     player.addSkillXP(SKILLS.FARMING, 2 * quantity);
+    this._checkPendingProfession(socketId, player);
     this._sendInventoryUpdate(socketId, player);
   }
 
   // --- Shipping Bin ---
 
   handleShipItem(player, itemId, quantity) {
-    // Find the specific slot to get quality
     const slot = player.inventory.find(i => i.itemId === itemId && i.quantity >= quantity);
     if (!slot) return null;
 
@@ -655,7 +1011,6 @@ export class GameWorld {
 
   _processShippingBins() {
     for (const [playerId, items] of this.shippingBins) {
-      // players Map is keyed by socketId, so find by persistent player id
       let player = null;
       for (const p of this.players.values()) {
         if (p.id === playerId) { player = p; break; }
@@ -668,7 +1023,22 @@ export class GameWorld {
         const fishItem = fishData[item.itemId];
         const basePrice = cropData?.sellPrice || fishItem?.value || 10;
         const multiplier = QUALITY_MULTIPLIER[item.quality] || 1;
-        totalCoins += Math.floor(basePrice * multiplier) * item.quantity;
+        let price = Math.floor(basePrice * multiplier) * item.quantity;
+
+        // Tiller profession: +10% crop sell value
+        if (cropData && player.hasProfession('tiller')) {
+          price = Math.floor(price * 1.1);
+        }
+
+        // Fisher/Angler profession: fish sell value bonus
+        if (fishItem) {
+          const fishBonus = player.getProfessionBonus('fishSellValue');
+          if (fishBonus > 0) {
+            price = Math.floor(price * (1 + fishBonus));
+          }
+        }
+
+        totalCoins += price;
       }
 
       if (totalCoins > 0) {
@@ -680,16 +1050,295 @@ export class GameWorld {
     this.shippingBins.clear();
   }
 
+  handleToolUpgrade(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.TOWN) return;
+
+    const tool = data.tool;
+    if (!player.toolTiers || player.toolTiers[tool] === undefined) return;
+
+    const currentTier = player.toolTiers[tool];
+    const nextTier = currentTier + 1;
+    if (nextTier > TOOL_TIERS.IRIDIUM) return;
+
+    const cost = TOOL_UPGRADE_COST[nextTier];
+    if (!cost) return;
+    if (player.coins < cost.coins) return;
+    if (!player.hasItem(cost.bars, cost.barQty)) return;
+
+    player.coins -= cost.coins;
+    player.removeItem(cost.bars, cost.barQty);
+    player.toolTiers[tool] = nextTier;
+
+    this._sendInventoryUpdate(socketId, player);
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'toolUpgraded', tool, newTier: nextTier,
+    });
+  }
+
+  handlePlaceSprinkler(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!player.hasItem(data.sprinklerType, 1)) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+
+    // Don't place on existing sprinkler
+    for (const s of farmMap.sprinklers.values()) {
+      if (s.tileX === data.x && s.tileZ === data.z) return;
+    }
+
+    player.removeItem(data.sprinklerType, 1);
+    const sprinkler = new Sprinkler({ type: data.sprinklerType, tileX: data.x, tileZ: data.z });
+    farmMap.sprinklers.set(sprinkler.id, sprinkler);
+
+    this._sendInventoryUpdate(socketId, player);
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'sprinklerPlaced', sprinkler: sprinkler.getState(),
+    });
+  }
+
+  handleApplyFertilizer(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!player.hasItem(data.fertilizerType, 1)) return;
+    if (!FERTILIZER_DATA[data.fertilizerType]) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    for (const crop of farmMap.crops.values()) {
+      if (crop.tileX === data.x && crop.tileZ === data.z) {
+        if (crop.fertilizer) return; // already fertilized
+        crop.fertilizer = data.fertilizerType;
+        player.removeItem(data.fertilizerType, 1);
+        this._sendInventoryUpdate(socketId, player);
+        this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+          type: 'cropUpdate', crop: crop.getState(),
+        });
+        return;
+      }
+    }
+  }
+
+  // --- Processing Machines ---
+
+  handlePlaceMachine(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!player.hasItem(data.machineType, 1)) return;
+    if (!machinesData[data.machineType]) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+
+    // Don't place on existing machine
+    for (const m of farmMap.machines.values()) {
+      if (m.tileX === data.x && m.tileZ === data.z) return;
+    }
+
+    player.removeItem(data.machineType, 1);
+    const machine = new Machine({ type: data.machineType, tileX: data.x, tileZ: data.z });
+    farmMap.machines.set(machine.id, machine);
+
+    this._sendInventoryUpdate(socketId, player);
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'machinePlaced', machine: machine.getState(),
+    });
+  }
+
+  handleMachineInput(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const machine = farmMap.machines.get(data.machineId);
+    if (!machine || machine.processing) return;
+    if (!player.hasItem(data.itemId, 1)) return;
+
+    const machineInfo = machinesData[machine.type];
+    if (!machineInfo) return;
+
+    let outputItem, outputValue, timeHours;
+
+    for (const recipe of Object.values(machineInfo.recipes)) {
+      if (recipe.input && recipe.input === data.itemId) {
+        outputItem = recipe.output;
+        outputValue = recipe.outputValue;
+        timeHours = recipe.timeHours;
+        break;
+      }
+      if (recipe.inputCategory === 'crop') {
+        // Check if the item is a known crop
+        const cropInfo = cropsData[data.itemId];
+        if (cropInfo) {
+          outputItem = recipe.output;
+          if (recipe.valueMultiplier) {
+            outputValue = Math.floor(cropInfo.sellPrice * recipe.valueMultiplier);
+          }
+          if (recipe.valueBonus) {
+            outputValue = (outputValue || Math.floor(cropInfo.sellPrice * 2)) + recipe.valueBonus;
+          }
+          timeHours = recipe.timeHours;
+          break;
+        }
+      }
+    }
+
+    if (!outputItem || !timeHours) return;
+
+    player.removeItem(data.itemId, 1);
+    machine.startProcessing(data.itemId, outputItem, outputValue || 0, timeHours * 3600 * 1000);
+
+    this._sendInventoryUpdate(socketId, player);
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'machineUpdate', machine: machine.getState(),
+    });
+  }
+
+  handleMachineCollect(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const machine = farmMap.machines.get(data.machineId);
+    if (!machine) return;
+
+    const result = machine.collect();
+    if (!result) return;
+
+    player.addItem(result.itemId, 1);
+    player.addSkillXP(SKILLS.FARMING, 10);
+    this._checkPendingProfession(socketId, player);
+
+    this._sendInventoryUpdate(socketId, player);
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'machineUpdate', machine: machine.getState(),
+    });
+  }
+
+  // --- Foraging ---
+
+  handleForageCollect(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player) return;
+
+    const foraging = player.currentMap === MAP_IDS.FARM ? this.farmForaging : this.townForaging;
+    const spawn = foraging.collectAt(data.x, data.z);
+    if (!spawn) return;
+
+    const quality = this._rollForageQuality(player.getSkillLevel(SKILLS.FORAGING), player);
+
+    // Gatherer profession: 20% chance double forage
+    let qty = 1;
+    if (player.hasProfession('gatherer') && Math.random() < 0.2) {
+      qty = 2;
+    }
+
+    player.addItem(spawn.itemId, qty, quality);
+    player.addSkillXP(SKILLS.FORAGING, 7);
+    this._checkPendingProfession(socketId, player);
+
+    this._sendInventoryUpdate(socketId, player);
+    this._broadcastToMap(player.currentMap, ACTIONS.WORLD_UPDATE, {
+      type: 'forageCollected', spawnId: spawn.id,
+    });
+  }
+
+  _rollForageQuality(foragingLevel, player = null) {
+    // Botanist profession: forage always gold quality
+    if (player && player.hasProfession('botanist')) return 2;
+
+    const roll = Math.random();
+    if (roll < foragingLevel * 0.01) return 2;
+    if (roll < foragingLevel * 0.03) return 1;
+    return 0;
+  }
+
+  // --- Professions ---
+
+  _getProfessionOptions(player, skill, level) {
+    const skillProfs = PROFESSIONS[skill];
+    if (!skillProfs) return [];
+
+    if (level === 5) {
+      return skillProfs[5] || [];
+    }
+
+    if (level === 10) {
+      // Find which level-5 profession was chosen
+      const chosen5 = (player.professions[skill] || [])[0];
+      if (!chosen5 || !skillProfs[10][chosen5]) return [];
+      return skillProfs[10][chosen5];
+    }
+
+    return [];
+  }
+
+  _checkPendingProfession(socketId, player) {
+    if (player._pendingProfession) {
+      const { skill, level } = player._pendingProfession;
+      const options = this._getProfessionOptions(player, skill, level);
+      if (options.length > 0) {
+        this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+          type: 'professionChoice', skill, level, options,
+        });
+      }
+      player._pendingProfession = null;
+    }
+  }
+
+  handleProfessionChoice(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player) return;
+
+    const { skill, professionId } = data;
+
+    // Validate the skill exists in PROFESSIONS
+    const skillProfs = PROFESSIONS[skill];
+    if (!skillProfs) return;
+
+    if (!player.professions[skill]) player.professions[skill] = [];
+
+    // Don't allow picking same level twice
+    const existingCount = player.professions[skill].length;
+    const skillLevel = player.getSkillLevel(skill);
+    if (existingCount >= 1 && skillLevel < 10) return;
+    if (existingCount >= 2) return;
+
+    // Validate that the professionId is actually a valid option
+    const level = existingCount === 0 ? 5 : 10;
+    const options = this._getProfessionOptions(player, skill, level);
+    if (!options.find(o => o.id === professionId)) return;
+
+    player.professions[skill].push(professionId);
+
+    // Save to database
+    const db = getDB();
+    db.prepare('UPDATE players SET professions = ? WHERE id = ?')
+      .run(JSON.stringify(player.professions), player.id);
+
+    this._sendInventoryUpdate(socketId, player);
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'professionChosen', skill, professionId,
+    });
+  }
+
   // --- Helpers ---
 
-  _rollCropQuality(farmingLevel) {
+  _rollCropQuality(farmingLevel, fertilizer = null) {
     const roll = Math.random();
-    const goldChance = farmingLevel * 0.015;     // 1.5% per level
-    const silverChance = farmingLevel * 0.03;     // 3% per level
+    let goldChance = farmingLevel * 0.015;
+    let silverChance = farmingLevel * 0.03;
 
-    if (roll < goldChance) return 2;              // Gold
-    if (roll < goldChance + silverChance) return 1; // Silver
-    return 0;                                      // Normal
+    if (fertilizer) {
+      const fData = FERTILIZER_DATA[fertilizer];
+      if (fData) {
+        goldChance += fData.qualityBonus * 0.5;
+        silverChance += fData.qualityBonus;
+      }
+    }
+
+    if (roll < goldChance) return 2;
+    if (roll < goldChance + silverChance) return 1;
+    return 0;
   }
 
   _sendInventoryUpdate(socketId, player) {
@@ -700,29 +1349,67 @@ export class GameWorld {
       energy: player.energy,
       maxEnergy: player.maxEnergy,
       skills: player.skills,
+      professions: player.professions,
+      toolTiers: player.toolTiers,
     });
   }
 
-  _broadcastWorldUpdate() {
-    const crops = Array.from(this.crops.values()).map(c => c.getState());
-    const animals = Array.from(this.animals.values()).map(a => a.getState());
-    const pets = Array.from(this.pets.values()).map(p => p.getState());
-    this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'fullSync', crops, animals, pets });
+  /** Broadcast to all players on a specific map, optionally excluding one socket */
+  _broadcastToMap(mapId, event, data, excludeSocketId = null) {
+    for (const [socketId, player] of this.players) {
+      if (player.currentMap === mapId && socketId !== excludeSocketId) {
+        this.io.to(socketId).emit(event, data);
+      }
+    }
   }
 
-  _getFullState(playerId) {
+  _broadcastWorldUpdate() {
+    // Send full sync to all players, scoped to their current map
+    for (const [socketId, player] of this.players) {
+      const map = this._getPlayerMap(player);
+      const crops = Array.from(map.crops.values()).map(c => c.getState());
+      const animals = Array.from(map.animals.values()).map(a => a.getState());
+      const pets = Array.from(map.pets.values()).map(p => p.getState());
+      const sprinklers = Array.from(map.sprinklers.values()).map(s => s.getState());
+      const machines = Array.from(map.machines.values()).map(m => m.getState());
+      const forageItems = player.currentMap === MAP_IDS.FARM
+        ? this.farmForaging.getState()
+        : this.townForaging.getState();
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, { type: 'fullSync', crops, animals, pets, sprinklers, machines, forageItems });
+    }
+  }
+
+  _getFullState(player) {
+    const map = this._getPlayerMap(player);
+    const mapState = map.getFullState();
+
+    // Only include players on the same map
+    const samePlayers = [];
+    for (const p of this.players.values()) {
+      if (p.currentMap === player.currentMap) {
+        samePlayers.push(p.getState());
+      }
+    }
+
     return {
-      playerId,
-      tiles: this.tiles,
-      decorations: this.decorations,
-      crops: Array.from(this.crops.values()).map(c => c.getState()),
-      animals: Array.from(this.animals.values()).map(a => a.getState()),
-      pets: Array.from(this.pets.values()).map(p => p.getState()),
-      npcs: this.npcs.map(n => n.getState()),
-      players: Array.from(this.players.values()).map(p => p.getState()),
-      buildings: Array.from(this.buildings.values()),
+      playerId: player.id,
+      mapId: player.currentMap,
+      tiles: mapState.tiles,
+      decorations: mapState.decorations,
+      crops: mapState.crops,
+      animals: mapState.animals,
+      pets: mapState.pets,
+      npcs: mapState.npcs,
+      sprinklers: mapState.sprinklers,
+      machines: mapState.machines,
+      players: samePlayers,
+      buildings: mapState.buildings,
       time: this.time.getState(),
       weather: this.weather.getState(),
+      recipes: recipesData,
+      forageItems: player.currentMap === MAP_IDS.FARM
+        ? this.farmForaging.getState()
+        : this.townForaging.getState(),
     };
   }
 
@@ -747,6 +1434,9 @@ export class GameWorld {
       for (const [name, data] of Object.entries(player.skills)) {
         stmt.run(player.id, name, data.level, data.xp);
       }
+      // Also persist professions
+      db.prepare('UPDATE players SET professions = ? WHERE id = ?')
+        .run(JSON.stringify(player.professions), player.id);
     });
     saveAll();
   }

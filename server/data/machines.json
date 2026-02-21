@@ -1,0 +1,27 @@
+{
+  "keg": {
+    "name": "Keg",
+    "recipes": {
+      "fruit_wine": { "inputCategory": "crop", "output": "wine", "timeHours": 168, "valueMultiplier": 3.0 },
+      "vegetable_juice": { "inputCategory": "crop", "output": "juice", "timeHours": 96, "valueMultiplier": 2.25 }
+    }
+  },
+  "preserves_jar": {
+    "name": "Preserves Jar",
+    "recipes": {
+      "any_crop": { "inputCategory": "crop", "output": "preserves", "timeHours": 72, "valueMultiplier": 2.0, "valueBonus": 50 }
+    }
+  },
+  "cheese_press": {
+    "name": "Cheese Press",
+    "recipes": {
+      "milk_cheese": { "input": "milk", "output": "cheese", "timeHours": 3.3, "outputValue": 200 }
+    }
+  },
+  "mayonnaise_machine": {
+    "name": "Mayonnaise Machine",
+    "recipes": {
+      "egg_mayo": { "input": "egg", "output": "mayonnaise", "timeHours": 3, "outputValue": 190 }
+    }
+  }
+}

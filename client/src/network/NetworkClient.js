@@ -76,7 +76,17 @@ export class NetworkClient {
   sendCraftCollect(buildingId) { this.socket.emit(ACTIONS.CRAFT_COLLECT, { buildingId }); }
   sendBuy(itemId, quantity) { this.socket.emit(ACTIONS.SHOP_BUY, { itemId, quantity }); }
   sendSell(itemId, quantity) { this.socket.emit(ACTIONS.SHOP_SELL, { itemId, quantity }); }
+  sendAnimalFeed(animalId) { this.socket.emit(ACTIONS.ANIMAL_FEED, { animalId }); }
+  sendAnimalCollect(animalId) { this.socket.emit(ACTIONS.ANIMAL_COLLECT, { animalId }); }
+  sendToolUpgrade(tool) { this.socket.emit(ACTIONS.TOOL_UPGRADE, { tool }); }
+  sendPlaceSprinkler(sprinklerType, x, z) { this.socket.emit(ACTIONS.PLACE_SPRINKLER, { sprinklerType, x, z }); }
+  sendApplyFertilizer(fertilizerType, x, z) { this.socket.emit(ACTIONS.APPLY_FERTILIZER, { fertilizerType, x, z }); }
+  sendPlaceMachine(machineType, x, z) { this.socket.emit(ACTIONS.PLACE_MACHINE, { machineType, x, z }); }
+  sendMachineInput(machineId, itemId) { this.socket.emit(ACTIONS.MACHINE_INPUT, { machineId, itemId }); }
+  sendMachineCollect(machineId) { this.socket.emit(ACTIONS.MACHINE_COLLECT, { machineId }); }
+  sendForageCollect(x, z) { this.socket.emit(ACTIONS.FORAGE_COLLECT, { x, z }); }
   sendShipItem(itemId, quantity = 1) { this.socket.emit(ACTIONS.SHIP_ITEM, { itemId, quantity }); }
+  sendProfessionChoice(skill, professionId) { this.socket.emit(ACTIONS.PROFESSION_CHOICE, { skill, professionId }); }
   sendChat(message) { this.socket.emit(ACTIONS.CHAT_MESSAGE, { message }); }
 
   // ─── Event system ───
