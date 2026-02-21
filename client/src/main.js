@@ -9,6 +9,7 @@ import { NetworkClient } from './network/NetworkClient.js';
 import { TerrainRenderer } from './world/TerrainRenderer.js';
 import { WaterRenderer } from './world/WaterRenderer.js';
 import { CropRenderer } from './world/CropRenderer.js';
+import { SprinklerRenderer } from './world/SprinklerRenderer.js';
 import { WeatherRenderer } from './world/WeatherRenderer.js';
 import { BuildingRenderer } from './world/BuildingRenderer.js';
 import { DecorationRenderer } from './world/DecorationRenderer.js';
@@ -45,6 +46,7 @@ async function main() {
   const npcs = new NPCRenderer(sceneManager.scene, assets);
   const pets = new PetRenderer(sceneManager.scene, assets);
   const animals = new AnimalRenderer(sceneManager.scene, assets);
+  const sprinklers = new SprinklerRenderer(sceneManager.scene);
 
   // --- UI ---
   const hud = new HUD(document.getElementById('hud'));
@@ -102,6 +104,7 @@ async function main() {
     animals.build(state.animals);
     buildings.build(state.buildings);
     decorations.build(state.decorations || []);
+    sprinklers.build(state.sprinklers || []);
 
     // Ambient creatures (client-side only)
     let creatures = new AmbientCreatureRenderer(sceneManager.scene, state.tiles);
@@ -195,6 +198,9 @@ async function main() {
         case 'pickaxe':
           network.sendHarvest(tile.x, tile.z);
           break;
+        case 'sprinkler':
+          network.sendPlaceSprinkler(activeItem.itemId, tile.x, tile.z);
+          break;
       }
 
       // Queue the tool animation on the local player
@@ -270,9 +276,14 @@ async function main() {
         case 'petUpdate':
           console.log(data.message);
           break;
+        case 'sprinklerPlaced':
+          sprinklers.addSprinkler(data.sprinkler);
+          break;
         case 'fullSync':
           crops.dispose();
           crops.build(data.crops);
+          sprinklers.dispose();
+          sprinklers.build(data.sprinklers || []);
           break;
         case 'craftStarted':
           if (buildingsMap[data.buildingId]) {
@@ -310,6 +321,8 @@ async function main() {
           buildings.build(ms.buildings || []);
           crops.dispose();
           crops.build(ms.crops || []);
+          sprinklers.dispose();
+          sprinklers.build(ms.sprinklers || []);
           npcs.dispose();
           npcs.build(ms.npcs || []);
           pets.dispose();

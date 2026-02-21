@@ -57,6 +57,11 @@ const ITEMS = {
   copper_ore:   { emoji: '\u{1FAA8}', color: '#b87333', name: 'Copper Ore' },
   iron_ore:     { emoji: '\u{1FAA8}', color: '#a0a0a0', name: 'Iron Ore' },
   gold_ore:     { emoji: '\u{1FAA8}', color: '#ffd700', name: 'Gold Ore' },
+
+  // Sprinklers
+  sprinkler_basic:   { emoji: '\u{1F4A7}', color: '#888888', name: 'Sprinkler' },
+  sprinkler_quality: { emoji: '\u{1F4A7}', color: '#ccaa44', name: 'Quality Sprinkler' },
+  sprinkler_iridium: { emoji: '\u{1F4A7}', color: '#8844aa', name: 'Iridium Sprinkler' },
 };
 
 const TOOLS = new Set(['hoe', 'watering_can', 'pickaxe', 'axe', 'fishing_rod']);
@@ -76,6 +81,7 @@ export function getItemIcon(itemId) {
 export function getToolAction(itemId) {
   if (TOOL_ACTIONS[itemId]) return TOOL_ACTIONS[itemId];
   if (isSeed(itemId)) return 'seeds';
+  if (itemId && itemId.startsWith('sprinkler_')) return 'sprinkler';
   return null;
 }
 

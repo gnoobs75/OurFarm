@@ -92,6 +92,7 @@ export const ACTIONS = {
   ANIMAL_COLLECT: 'animal:collect',
   SHIP_ITEM: 'ship:item',
   TOOL_UPGRADE: 'tool:upgrade',
+  PLACE_SPRINKLER: 'farm:placeSprinkler',
   WORLD_STATE: 'world:state',
   WORLD_UPDATE: 'world:update',
   TIME_UPDATE: 'time:update',
@@ -156,3 +157,17 @@ export const TOOL_ENERGY_COST = {
   pickaxe:      [3, 3, 2, 2, 1],
   axe:          [2, 2, 1, 1, 0],
 };
+
+export const SPRINKLER_DATA = {
+  sprinkler_basic: { tier: 1, range: 'adjacent', tiles: [[0,-1],[0,1],[-1,0],[1,0]] },
+  sprinkler_quality: { tier: 2, range: '3x3', tiles: [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]] },
+  sprinkler_iridium: { tier: 3, range: '5x5', tiles: [] },
+};
+// Fill iridium 5x5 minus center and corners
+for (let dx = -2; dx <= 2; dx++) {
+  for (let dz = -2; dz <= 2; dz++) {
+    if (dx === 0 && dz === 0) continue;
+    if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+    SPRINKLER_DATA.sprinkler_iridium.tiles.push([dx, dz]);
+  }
+}

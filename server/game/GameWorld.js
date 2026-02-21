@@ -4,7 +4,7 @@
 // Supports multiple maps (farm, town) with portal transitions.
 
 import { v4 as uuid } from 'uuid';
-import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST } from '../../shared/constants.js';
+import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA } from '../../shared/constants.js';
 import { isValidTile, tileIndex } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { DecorationGenerator } from './DecorationGenerator.js';
@@ -16,6 +16,7 @@ import { Crop } from '../entities/Crop.js';
 import { NPC } from '../entities/NPC.js';
 import { Pet } from '../entities/Pet.js';
 import { Animal } from '../entities/Animal.js';
+import { Sprinkler } from '../entities/Sprinkler.js';
 import { FishCalculator } from '../entities/Fish.js';
 import { getDB } from '../db/database.js';
 import { logger } from '../utils/Logger.js';
@@ -280,8 +281,20 @@ export class GameWorld {
     const newWeather = this.weather.onNewDay(this.time.season);
     this.io.emit(ACTIONS.WEATHER_UPDATE, { weather: newWeather });
 
-    // Rain waters all crops on farm
+    // Sprinklers auto-water crops at dawn
     const farmMap = this.maps.get(MAP_IDS.FARM);
+    for (const sprinkler of farmMap.sprinklers.values()) {
+      const wateredTiles = sprinkler.getWateredTiles();
+      for (const t of wateredTiles) {
+        for (const crop of farmMap.crops.values()) {
+          if (crop.tileX === t.x && crop.tileZ === t.z) {
+            crop.watered = true;
+          }
+        }
+      }
+    }
+
+    // Rain waters all crops on farm
     if (this.weather.isRaining()) {
       for (const crop of farmMap.crops.values()) {
         crop.watered = true;
@@ -936,6 +949,28 @@ export class GameWorld {
     });
   }
 
+  handlePlaceSprinkler(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!player.hasItem(data.sprinklerType, 1)) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+
+    // Don't place on existing sprinkler
+    for (const s of farmMap.sprinklers.values()) {
+      if (s.tileX === data.x && s.tileZ === data.z) return;
+    }
+
+    player.removeItem(data.sprinklerType, 1);
+    const sprinkler = new Sprinkler({ type: data.sprinklerType, tileX: data.x, tileZ: data.z });
+    farmMap.sprinklers.set(sprinkler.id, sprinkler);
+
+    this._sendInventoryUpdate(socketId, player);
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'sprinklerPlaced', sprinkler: sprinkler.getState(),
+    });
+  }
+
   // --- Helpers ---
 
   _rollCropQuality(farmingLevel) {
@@ -975,7 +1010,8 @@ export class GameWorld {
       const crops = Array.from(map.crops.values()).map(c => c.getState());
       const animals = Array.from(map.animals.values()).map(a => a.getState());
       const pets = Array.from(map.pets.values()).map(p => p.getState());
-      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, { type: 'fullSync', crops, animals, pets });
+      const sprinklers = Array.from(map.sprinklers.values()).map(s => s.getState());
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, { type: 'fullSync', crops, animals, pets, sprinklers });
     }
   }
 
@@ -1000,6 +1036,7 @@ export class GameWorld {
       animals: mapState.animals,
       pets: mapState.pets,
       npcs: mapState.npcs,
+      sprinklers: mapState.sprinklers,
       players: samePlayers,
       buildings: mapState.buildings,
       time: this.time.getState(),
