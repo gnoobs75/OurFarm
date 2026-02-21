@@ -30,6 +30,16 @@ export class PetRenderer {
     }
   }
 
+  getPetAtPosition(worldX, worldZ) {
+    const threshold = 0.6;
+    for (const [id, entry] of this.petMeshes) {
+      const dx = entry.mesh.position.x - worldX;
+      const dz = entry.mesh.position.z - worldZ;
+      if (Math.sqrt(dx * dx + dz * dz) < threshold) return id;
+    }
+    return null;
+  }
+
   dispose() {
     for (const { mesh } of this.petMeshes.values()) this.scene.remove(mesh);
     this.petMeshes.clear();

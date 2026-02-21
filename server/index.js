@@ -152,6 +152,9 @@ io.on('connection', (socket) => {
   wrap(ACTIONS.ANIMAL_FEED, (data) => world.handleAnimalFeed(socket.id, data));
   wrap(ACTIONS.ANIMAL_COLLECT, (data) => world.handleAnimalCollect(socket.id, data));
 
+  // Pet interaction
+  wrap(ACTIONS.PET_INTERACT, (data) => world.handlePetInteract(socket.id, data));
+
   // Shop
   wrap(ACTIONS.SHOP_BUY, (data) => world.handleShopBuy(socket.id, data));
   wrap(ACTIONS.SHOP_SELL, (data) => world.handleShopSell(socket.id, data));

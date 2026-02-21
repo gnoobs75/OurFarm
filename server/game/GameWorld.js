@@ -150,6 +150,10 @@ export class GameWorld {
       farmMap.animals.set(animal.id, animal);
     }
 
+    // Spawn starter pet
+    const starterPet = new Pet({ ownerId: null, type: 'dog', name: 'Buddy', x: 30, z: 31 });
+    farmMap.pets.set(starterPet.id, starterPet);
+
     logger.info('WORLD', 'Starter farm initialized', {
       farmBuildings: farmMap.buildings.size,
       farmCrops: farmMap.crops.size,
@@ -334,6 +338,15 @@ export class GameWorld {
     const player = new Player({ id: playerId, name: data.name || row.name, skills });
     player.socketId = socket.id;
     this.players.set(socket.id, player);
+
+    // Assign unowned pet to this player
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    for (const pet of farmMap.pets.values()) {
+      if (!pet.ownerId) {
+        pet.ownerId = player.id;
+        break;
+      }
+    }
 
     const fullState = this._getFullState(player);
     socket.emit(ACTIONS.WORLD_STATE, fullState);
@@ -677,6 +690,41 @@ export class GameWorld {
     this._sendInventoryUpdate(socketId, player);
     this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
       type: 'animalUpdate', animal: animal.getState(),
+    });
+  }
+
+  handlePetInteract(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const pet = farmMap.pets.get(data.petId);
+    if (!pet || pet.ownerId !== player.id) return;
+
+    let message = '';
+    switch (data.action) {
+      case 'pet':
+        pet.pet();
+        message = `${pet.name || 'Pet'} wags happily!`;
+        break;
+      case 'feed':
+        pet.feed();
+        message = `${pet.name || 'Pet'} eats eagerly!`;
+        break;
+      case 'train':
+        if (pet.energy < 20) {
+          message = `${pet.name || 'Pet'} is too tired to train.`;
+          break;
+        }
+        pet.train();
+        message = `${pet.name || 'Pet'} learned something new!`;
+        break;
+      default:
+        return;
+    }
+
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'petUpdate', pet: pet.getState(), message,
     });
   }
 

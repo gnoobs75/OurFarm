@@ -132,6 +132,13 @@ async function main() {
         return;
       }
 
+      // Check for pet interaction
+      const petId = pets.getPetAtPosition(worldPos.x, worldPos.z);
+      if (petId) {
+        network.sendPetInteract(petId, 'pet');
+        return;
+      }
+
       // Check for NPC first
       const npcId = npcs.getNPCAtPosition(worldPos.x, worldPos.z);
       if (npcId) {
@@ -224,6 +231,9 @@ async function main() {
             const entry = animals.animalMeshes.get(data.animal.id);
             if (entry) entry.data = data.animal;
           }
+          break;
+        case 'petUpdate':
+          console.log(data.message);
           break;
         case 'fullSync':
           crops.dispose();
