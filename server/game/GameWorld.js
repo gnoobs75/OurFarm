@@ -97,6 +97,22 @@ export class GameWorld {
       }
     }
 
+
+    // Place town buildings
+    const townBuildings = [
+      { id: 'bakery',         type: 'bakery',       tileX: 26, tileZ: 7 },
+      { id: 'blacksmith',     type: 'blacksmith',    tileX: 36, tileZ: 7 },
+      { id: 'library',        type: 'library',       tileX: 31, tileZ: 5 },
+      { id: 'town_hall',      type: 'town_hall',     tileX: 34, tileZ: 4 },
+      { id: 'vet_clinic',     type: 'vet_clinic',    tileX: 26, tileZ: 11 },
+      { id: 'fishing_hut',    type: 'fishing_hut',   tileX: 44, tileZ: 10 },
+      { id: 'general_store',  type: 'shop',          tileX: 40, tileZ: 7 },
+      { id: 'shipping_bin',   type: 'shipping_bin',  tileX: 30, tileZ: 32 },
+    ];
+    for (const b of townBuildings) {
+      this.buildings.set(b.id, b);
+    }
+
     logger.info('WORLD', 'Starter farm initialized', {
       buildings: this.buildings.size,
       crops: this.crops.size,

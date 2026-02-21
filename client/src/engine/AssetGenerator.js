@@ -395,13 +395,21 @@ export class AssetGenerator {
   createBuilding(type) {
     const group = new THREE.Group();
     const configs = {
-      house: { w: 2, h: 1.5, d: 2, color: 0xc4956a, roofColor: 0x8b4513 },
-      barn:  { w: 3, h: 2, d: 2.5, color: 0xcc3333, roofColor: 0x5c2a0e },
-      coop:  { w: 1.5, h: 1, d: 1.5, color: 0xdeb887, roofColor: 0x8b6914 },
-      mill:  { w: 1.5, h: 2.5, d: 1.5, color: 0xf5f5dc, roofColor: 0x666666 },
-      shop:  { w: 2, h: 1.5, d: 2, color: 0x6495ed, roofColor: 0x4169e1 },
+      house:       { w: 2, h: 1.5, d: 2, color: 0xc4956a, roofColor: 0x8b4513 },
+      barn:        { w: 3, h: 2, d: 2.5, color: 0xcc3333, roofColor: 0x5c2a0e },
+      coop:        { w: 1.5, h: 1, d: 1.5, color: 0xdeb887, roofColor: 0x8b6914 },
+      mill:        { w: 1.5, h: 2.5, d: 1.5, color: 0xf5f5dc, roofColor: 0x666666 },
+      shop:        { w: 2, h: 1.5, d: 2, color: 0x6495ed, roofColor: 0x4169e1 },
+      bakery:      { w: 2.2, h: 1.6, d: 2, color: 0xf5c07a, roofColor: 0xcc6633 },
+      blacksmith:  { w: 2.5, h: 1.8, d: 2.2, color: 0x555555, roofColor: 0x333333 },
+      library:     { w: 2, h: 1.8, d: 2.5, color: 0x8866aa, roofColor: 0x554477 },
+      fishing_hut: { w: 1.5, h: 1.2, d: 1.5, color: 0x88aacc, roofColor: 0x336699 },
+      town_hall:   { w: 3, h: 2.2, d: 2.5, color: 0xddd8c4, roofColor: 0x445566 },
+      vet_clinic:  { w: 2, h: 1.5, d: 2, color: 0xaaddaa, roofColor: 0x558855 },
+      shipping_bin:{ w: 0.8, h: 0.5, d: 0.8, color: 0x8b6b4a, roofColor: 0x6b4a2a },
     };
     const cfg = configs[type] || configs.house;
+    const isShippingBin = type === 'shipping_bin';
 
     // Walls
     const walls = new THREE.Mesh(
@@ -412,42 +420,47 @@ export class AssetGenerator {
     walls.receiveShadow = true;
     group.add(walls);
 
-    // Roof — pyramid
+    // Roof — pyramid (hidden for shipping bin)
     const roof = new THREE.Mesh(
       new THREE.ConeGeometry(cfg.w * 0.85, cfg.h * 0.45, 4), this.getMaterial(cfg.roofColor)
     );
     roof.position.y = cfg.h + cfg.h * 0.225;
     roof.rotation.y = Math.PI / 4;
     roof.castShadow = true;
+    if (isShippingBin) roof.visible = false;
     group.add(roof);
 
-    // Door
+    // Door (hidden for shipping bin)
     const door = new THREE.Mesh(
       new THREE.PlaneGeometry(0.4, 0.65), this.getMaterial(0x4a2a0e)
     );
     door.position.set(0, 0.325, cfg.d / 2 + 0.01);
+    if (isShippingBin) door.visible = false;
     group.add(door);
 
-    // Door knob
+    // Door knob (hidden for shipping bin)
     const knob = new THREE.Mesh(
       new THREE.SphereGeometry(0.02, 4, 3), this.getMaterial(0xdaa520)
     );
     knob.position.set(0.12, 0.35, cfg.d / 2 + 0.02);
+    if (isShippingBin) knob.visible = false;
     group.add(knob);
 
-    // Windows — front + sides, soft glow
-    const windowMat = this.getMaterial(0xaaddff, { emissive: 0x334455, emissiveIntensity: 0.3 });
-    for (const side of [-1, 1]) {
-      // Front windows flanking door
-      const win = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.25), windowMat);
-      win.position.set(side * cfg.w * 0.3, cfg.h * 0.6, cfg.d / 2 + 0.01);
-      group.add(win);
+    // Windows — front + sides, soft glow (skip for shipping bin)
+    if (!isShippingBin) {
+      const windowMat = this.getMaterial(0xaaddff, { emissive: 0x334455, emissiveIntensity: 0.3 });
+      for (const side of [-1, 1]) {
+        // Front windows flanking door
+        const win = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.25), windowMat);
+        win.position.set(side * cfg.w * 0.3, cfg.h * 0.6, cfg.d / 2 + 0.01);
+        group.add(win);
 
-      // Side windows
-      const sideWin = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.25), windowMat);
-      sideWin.position.set(side * (cfg.w / 2 + 0.01), cfg.h * 0.6, 0);
-      sideWin.rotation.y = Math.PI / 2;
-      group.add(sideWin);
+        // Side windows
+        const sideWin = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.25), windowMat);
+        sideWin.position.set(side * (cfg.w / 2 + 0.01), cfg.h * 0.6, 0);
+        sideWin.rotation.y = Math.PI / 2;
+        group.add(sideWin);
+      }
     }
 
     // ── House extras: chimney + porch ──
@@ -486,6 +499,98 @@ export class AssetGenerator {
         hay.castShadow = true;
         group.add(hay);
       }
+    }
+
+    // ── Bakery extras: chimney + warm glow doorway ──
+    if (type === 'bakery') {
+      const chimney = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.6, 0.25), this.getMaterial(0x884433)
+      );
+      chimney.position.set(cfg.w * 0.3, cfg.h + cfg.h * 0.35, -cfg.d * 0.2);
+      chimney.castShadow = true;
+      group.add(chimney);
+
+      // Warm glow around the doorway
+      const glow = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.5, 0.7),
+        this.getMaterial(0xffaa44, { emissive: 0xff8833, emissiveIntensity: 0.5 })
+      );
+      glow.position.set(0, 0.35, cfg.d / 2 + 0.005);
+      group.add(glow);
+    }
+
+    // ── Blacksmith extras: anvil outside + chimney ──
+    if (type === 'blacksmith') {
+      // Chimney (taller, darker)
+      const chimney = new THREE.Mesh(
+        new THREE.BoxGeometry(0.3, 0.8, 0.3), this.getMaterial(0x444444)
+      );
+      chimney.position.set(-cfg.w * 0.25, cfg.h + cfg.h * 0.4, -cfg.d * 0.2);
+      chimney.castShadow = true;
+      group.add(chimney);
+
+      // Anvil — dark block with a flat top
+      const anvilBase = new THREE.Mesh(
+        new THREE.BoxGeometry(0.3, 0.25, 0.2), this.getMaterial(0x333333)
+      );
+      anvilBase.position.set(cfg.w / 2 + 0.5, 0.125, 0.3);
+      anvilBase.castShadow = true;
+      group.add(anvilBase);
+
+      const anvilTop = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, 0.08, 0.25), this.getMaterial(0x444444)
+      );
+      anvilTop.position.set(cfg.w / 2 + 0.5, 0.29, 0.3);
+      anvilTop.castShadow = true;
+      group.add(anvilTop);
+    }
+
+    // ── Town Hall extras: clock face + flag pole with flag ──
+    if (type === 'town_hall') {
+      // Clock face on the front wall
+      const clockFace = new THREE.Mesh(
+        new THREE.CircleGeometry(0.2, 8),
+        this.getMaterial(0xfffff0)
+      );
+      clockFace.position.set(0, cfg.h * 0.85, cfg.d / 2 + 0.015);
+      group.add(clockFace);
+
+      // Clock rim
+      const clockRim = new THREE.Mesh(
+        new THREE.RingGeometry(0.19, 0.22, 12),
+        this.getMaterial(0x8b7355)
+      );
+      clockRim.position.set(0, cfg.h * 0.85, cfg.d / 2 + 0.02);
+      group.add(clockRim);
+
+      // Flag pole
+      const pole = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.02, 1.2, 4),
+        this.getMaterial(0x888888)
+      );
+      pole.position.set(cfg.w / 2 + 0.3, cfg.h * 0.6 + 0.6, cfg.d / 2 - 0.3);
+      pole.castShadow = true;
+      group.add(pole);
+
+      // Flag
+      const flag = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.4, 0.25),
+        this.getMaterial(0xcc2222, { side: THREE.DoubleSide })
+      );
+      flag.position.set(cfg.w / 2 + 0.3 + 0.22, cfg.h * 0.6 + 1.05, cfg.d / 2 - 0.3);
+      group.add(flag);
+    }
+
+    // ── Shipping Bin extras: open-top box with dark interior ──
+    if (isShippingBin) {
+      // Dark interior visible from above
+      const interior = new THREE.Mesh(
+        new THREE.PlaneGeometry(cfg.w * 0.85, cfg.d * 0.85),
+        this.getMaterial(0x2a1a0e)
+      );
+      interior.rotation.x = -Math.PI / 2;
+      interior.position.y = cfg.h + 0.01;
+      group.add(interior);
     }
 
     return group;

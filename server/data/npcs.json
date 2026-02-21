@@ -3,7 +3,7 @@
     "id": "npc_baker", "name": "Rosie", "role": "Baker",
     "personality": "cheerful",
     "skinColor": "0xffcc99", "shirtColor": "0xff8866", "hairColor": "0xaa4400",
-    "homeX": 28, "homeZ": 8, "shopX": 30, "shopZ": 10,
+    "homeX": 27, "homeZ": 9, "shopX": 27, "shopZ": 9,
     "likedGifts": ["wheat", "strawberry", "egg"],
     "dialogue": {
       "intro": "Hi there! I'm Rosie. I run the bakery in town!",
@@ -16,7 +16,7 @@
     "id": "npc_smith", "name": "Grim", "role": "Blacksmith",
     "personality": "grumpy",
     "skinColor": "0xcc9966", "shirtColor": "0x555555", "hairColor": "0x222222",
-    "homeX": 35, "homeZ": 6, "shopX": 36, "shopZ": 8,
+    "homeX": 37, "homeZ": 9, "shopX": 37, "shopZ": 9,
     "likedGifts": ["copper_ore", "iron_ore", "gold_ore"],
     "dialogue": {
       "intro": "What do you want? I'm busy. Name's Grim.",
@@ -29,7 +29,7 @@
     "id": "npc_librarian", "name": "Willow", "role": "Librarian",
     "personality": "shy",
     "skinColor": "0xffe0cc", "shirtColor": "0x8866aa", "hairColor": "0x553388",
-    "homeX": 32, "homeZ": 5, "shopX": 33, "shopZ": 7,
+    "homeX": 32, "homeZ": 7, "shopX": 32, "shopZ": 7,
     "likedGifts": ["blueberry", "pumpkin"],
     "dialogue": {
       "intro": "Oh! I didn't see you there... I'm Willow.",
@@ -42,7 +42,7 @@
     "id": "npc_fisher", "name": "Old Pete", "role": "Fisherman",
     "personality": "laid-back",
     "skinColor": "0xddaa77", "shirtColor": "0x336699", "hairColor": "0xaaaaaa",
-    "homeX": 45, "homeZ": 32, "shopX": 48, "shopZ": 34,
+    "homeX": 45, "homeZ": 12, "shopX": 45, "shopZ": 12,
     "likedGifts": ["bass", "salmon", "sturgeon"],
     "dialogue": {
       "intro": "Well hey there! Name's Pete. Pull up a chair, the fish ain't bitin' anyway.",
@@ -55,7 +55,7 @@
     "id": "npc_mayor", "name": "Mayor Hart", "role": "Mayor",
     "personality": "formal",
     "skinColor": "0xffcc99", "shirtColor": "0x224466", "hairColor": "0x666666",
-    "homeX": 30, "homeZ": 4, "shopX": 32, "shopZ": 6,
+    "homeX": 35, "homeZ": 6, "shopX": 35, "shopZ": 6,
     "likedGifts": ["pumpkin", "gold_ore", "honey"],
     "dialogue": {
       "intro": "Welcome to our town! I'm Mayor Hart. We're glad to have a new farmer.",
@@ -68,7 +68,7 @@
     "id": "npc_vet", "name": "Dr. Fern", "role": "Veterinarian",
     "personality": "caring",
     "skinColor": "0xffe0cc", "shirtColor": "0x44aa66", "hairColor": "0x663300",
-    "homeX": 26, "homeZ": 7, "shopX": 27, "shopZ": 9,
+    "homeX": 27, "homeZ": 13, "shopX": 27, "shopZ": 13,
     "likedGifts": ["milk", "egg", "wool"],
     "dialogue": {
       "intro": "Hello! I'm Dr. Fern. I take care of all the animals around here.",
