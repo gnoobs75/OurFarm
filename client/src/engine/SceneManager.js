@@ -22,7 +22,7 @@ export class SceneManager {
 
     // Scene
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0x87ceeb, 40, 80);
+    this.scene.fog = new THREE.Fog(0x87ceeb, 100, 200);
 
     // Isometric camera
     const aspect = window.innerWidth / window.innerHeight;
@@ -63,25 +63,25 @@ export class SceneManager {
   }
 
   _setupLighting() {
-    // Ambient light — soft overall illumination
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    // Ambient — warm soft fill
+    const ambient = new THREE.AmbientLight(0xfff8ee, 0.55);
     this.scene.add(ambient);
 
-    // Directional light — sun
-    this.sunLight = new THREE.DirectionalLight(0xfff4e0, 1.0);
-    this.sunLight.position.set(30, 40, 20);
+    // Sun — warm golden-hour, lower angle for longer shadows
+    this.sunLight = new THREE.DirectionalLight(0xffe0a0, 1.1);
+    this.sunLight.position.set(20, 30, 15);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.set(2048, 2048);
-    this.sunLight.shadow.camera.left = -40;
-    this.sunLight.shadow.camera.right = 40;
-    this.sunLight.shadow.camera.top = 40;
-    this.sunLight.shadow.camera.bottom = -40;
+    this.sunLight.shadow.camera.left = -50;
+    this.sunLight.shadow.camera.right = 50;
+    this.sunLight.shadow.camera.top = 50;
+    this.sunLight.shadow.camera.bottom = -50;
     this.sunLight.shadow.camera.near = 1;
-    this.sunLight.shadow.camera.far = 100;
+    this.sunLight.shadow.camera.far = 120;
     this.scene.add(this.sunLight);
 
-    // Hemisphere light — sky/ground color blend
-    const hemi = new THREE.HemisphereLight(0x87ceeb, 0x5da832, 0.3);
+    // Hemisphere — warm sky to earthy ground
+    const hemi = new THREE.HemisphereLight(0x88ccee, 0x4a7a2a, 0.35);
     this.scene.add(hemi);
   }
 

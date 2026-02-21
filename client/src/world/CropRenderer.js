@@ -27,10 +27,12 @@ export class CropRenderer {
   updateCrop(cropId, newStage) {
     const entry = this.cropMeshes.get(cropId);
     if (!entry) return;
-    this.scene.remove(entry.mesh);
+    const oldMesh = entry.mesh;
+    this.scene.remove(oldMesh);
+    this._disposeGroup(oldMesh);
     entry.data.stage = newStage;
     const newMesh = this.assetGen.createCrop(entry.data.cropType, newStage);
-    newMesh.position.copy(entry.mesh.position);
+    newMesh.position.copy(oldMesh.position);
     this.scene.add(newMesh);
     entry.mesh = newMesh;
   }
@@ -39,8 +41,15 @@ export class CropRenderer {
     const entry = this.cropMeshes.get(cropId);
     if (entry) {
       this.scene.remove(entry.mesh);
+      this._disposeGroup(entry.mesh);
       this.cropMeshes.delete(cropId);
     }
+  }
+
+  _disposeGroup(obj) {
+    obj.traverse((child) => {
+      if (child.geometry) child.geometry.dispose();
+    });
   }
 
   update(delta) {
@@ -53,6 +62,7 @@ export class CropRenderer {
   dispose() {
     for (const { mesh } of this.cropMeshes.values()) {
       this.scene.remove(mesh);
+      this._disposeGroup(mesh);
     }
     this.cropMeshes.clear();
   }

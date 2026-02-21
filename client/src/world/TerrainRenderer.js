@@ -53,6 +53,7 @@ export class TerrainRenderer {
       const variation = (Math.sin(tile.x * 13.37 + tile.z * 7.31) * 0.03);
       color.r = Math.max(0, Math.min(1, color.r + variation));
       color.g = Math.max(0, Math.min(1, color.g + variation));
+      color.b = Math.max(0, Math.min(1, color.b + variation));
 
       // 4 vertices per tile (quad)
       const vi = vertices.length / 3;
@@ -69,8 +70,8 @@ export class TerrainRenderer {
         colors.push(color.r, color.g, color.b);
       }
 
-      // Two triangles per quad
-      indices.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
+      // Two triangles per quad (CCW winding so normals face up)
+      indices.push(vi, vi + 2, vi + 1, vi, vi + 3, vi + 2);
     }
 
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));

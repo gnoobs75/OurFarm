@@ -6,6 +6,7 @@ import { v4 as uuid } from 'uuid';
 import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE } from '../../shared/constants.js';
 import { isValidTile, tileIndex } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
+import { DecorationGenerator } from './DecorationGenerator.js';
 import { TimeManager } from './TimeManager.js';
 import { WeatherManager } from './WeatherManager.js';
 import { Player } from '../entities/Player.js';
@@ -40,6 +41,8 @@ export class GameWorld {
     const seed = this._getOrCreateSeed();
     this.terrainGen = new TerrainGenerator(seed);
     this.tiles = this.terrainGen.generate();
+    this.decorationGen = new DecorationGenerator(seed);
+    this.decorations = this.decorationGen.generate(this.tiles);
     this.time = new TimeManager();
     this.weather = new WeatherManager(seed);
     this.fishCalc = new FishCalculator(fishData);
@@ -52,9 +55,52 @@ export class GameWorld {
     this.npcs = npcsData.map(d => new NPC(d));
     this.buildings = new Map();
 
+    // Set up starter farm (buildings + crops) on first run
+    this._initStarterFarm();
+
     // Start tick loop
     this._tickInterval = null;
     this._lastTick = Date.now();
+  }
+
+  _initStarterFarm() {
+    // Only populate if buildings map is empty (first boot)
+    if (this.buildings.size > 0) return;
+
+    const cx = 32, cz = 32;
+
+    // Place house and barn
+    this.buildings.set('house_main', {
+      id: 'house_main', type: 'house', tileX: cx - 3, tileZ: cz - 1,
+    });
+    this.buildings.set('barn_main', {
+      id: 'barn_main', type: 'barn', tileX: cx - 4, tileZ: cz + 3,
+    });
+
+    // Pre-till a crop plot
+    for (let px = cx + 2; px <= cx + 6; px++) {
+      for (let pz = cz - 2; pz <= cz + 2; pz++) {
+        const idx = tileIndex(px, pz);
+        if (idx >= 0 && idx < this.tiles.length) {
+          this.tiles[idx].type = TILE_TYPES.TILLED;
+        }
+      }
+    }
+
+    // Plant starter corn at various growth stages
+    for (let px = cx + 2; px <= cx + 5; px++) {
+      for (let pz = cz - 1; pz <= cz + 1; pz++) {
+        const crop = new Crop({ tileX: px, tileZ: pz, cropType: 'corn' });
+        crop.stage = 1 + ((px + pz) % 3); // stages 1, 2, 3
+        this.crops.set(crop.id, crop);
+      }
+    }
+
+    logger.info('WORLD', 'Starter farm initialized', {
+      buildings: this.buildings.size,
+      crops: this.crops.size,
+      decorations: this.decorations.length,
+    });
   }
 
   _getOrCreateSeed() {
@@ -435,6 +481,7 @@ export class GameWorld {
     return {
       playerId,
       tiles: this.tiles,
+      decorations: this.decorations,
       crops: Array.from(this.crops.values()).map(c => c.getState()),
       animals: Array.from(this.animals.values()).map(a => a.getState()),
       pets: Array.from(this.pets.values()).map(p => p.getState()),

@@ -11,6 +11,7 @@ import { WaterRenderer } from './world/WaterRenderer.js';
 import { CropRenderer } from './world/CropRenderer.js';
 import { WeatherRenderer } from './world/WeatherRenderer.js';
 import { BuildingRenderer } from './world/BuildingRenderer.js';
+import { DecorationRenderer } from './world/DecorationRenderer.js';
 import { PlayerRenderer } from './entities/PlayerRenderer.js';
 import { NPCRenderer } from './entities/NPCRenderer.js';
 import { PetRenderer } from './entities/PetRenderer.js';
@@ -35,6 +36,7 @@ async function main() {
   const crops = new CropRenderer(sceneManager.scene, assets);
   const weather = new WeatherRenderer(sceneManager.scene);
   const buildings = new BuildingRenderer(sceneManager.scene, assets);
+  const decorations = new DecorationRenderer(sceneManager.scene, assets);
   const players = new PlayerRenderer(sceneManager.scene, assets);
   const npcs = new NPCRenderer(sceneManager.scene, assets);
   const pets = new PetRenderer(sceneManager.scene, assets);
@@ -73,6 +75,7 @@ async function main() {
     pets.build(state.pets);
     animals.build(state.animals);
     buildings.build(state.buildings);
+    decorations.build(state.decorations || []);
 
     // Add players
     for (const p of state.players) {
@@ -201,6 +204,7 @@ async function main() {
     sceneManager.onUpdate((delta) => {
       water.update(delta);
       crops.update(delta);
+      decorations.update(delta);
       weather.update(delta, sceneManager.cameraTarget);
       players.update(delta);
       npcs.update(delta);
