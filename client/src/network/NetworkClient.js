@@ -76,6 +76,7 @@ export class NetworkClient {
   sendCraftCollect(buildingId) { this.socket.emit(ACTIONS.CRAFT_COLLECT, { buildingId }); }
   sendBuy(itemId, quantity) { this.socket.emit(ACTIONS.SHOP_BUY, { itemId, quantity }); }
   sendSell(itemId, quantity) { this.socket.emit(ACTIONS.SHOP_SELL, { itemId, quantity }); }
+  sendShipItem(itemId, quantity = 1) { this.socket.emit(ACTIONS.SHIP_ITEM, { itemId, quantity }); }
   sendChat(message) { this.socket.emit(ACTIONS.CHAT_MESSAGE, { message }); }
 
   // ─── Event system ───

@@ -147,6 +147,14 @@ io.on('connection', (socket) => {
   wrap(ACTIONS.SHOP_BUY, (data) => world.handleShopBuy(socket.id, data));
   wrap(ACTIONS.SHOP_SELL, (data) => world.handleShopSell(socket.id, data));
 
+  // Shipping bin
+  wrap(ACTIONS.SHIP_ITEM, (data) => {
+    const player = world.players.get(socket.id);
+    if (player) {
+      world.handleShipItem(player, data.itemId, data.quantity || 1);
+    }
+  });
+
   // Disconnect
   socket.on('disconnect', (reason) => {
     logger.info('SOCKET', `Disconnected: ${socket.id}`, { reason });

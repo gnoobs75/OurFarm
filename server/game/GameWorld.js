@@ -54,6 +54,7 @@ export class GameWorld {
     this.pets = new Map();       // id -> Pet
     this.npcs = npcsData.map(d => new NPC(d));
     this.buildings = new Map();
+    this.shippingBins = new Map(); // playerId -> [{itemId, quantity, quality}]
 
     // Set up starter farm (buildings + crops) on first run
     this._initStarterFarm();
@@ -205,6 +206,9 @@ export class GameWorld {
     for (const player of this.players.values()) {
       player._collapsed = false;
     }
+
+    // Process shipping bins — pay players for items shipped yesterday
+    this._processShippingBins();
 
     logger.info('WORLD', `New day: Season ${this.time.season}, Day ${this.time.day}`, {
       crops: this.crops.size, animals: this.animals.size, players: this.players.size,
@@ -548,6 +552,50 @@ export class GameWorld {
     player.coins += price;
     player.addSkillXP(SKILLS.FARMING, 2 * quantity);
     this._sendInventoryUpdate(socketId, player);
+  }
+
+  // --- Shipping Bin ---
+
+  handleShipItem(player, itemId, quantity) {
+    // Find the specific slot to get quality
+    const slot = player.inventory.find(i => i.itemId === itemId && i.quantity >= quantity);
+    if (!slot) return null;
+
+    const quality = slot.quality || 0;
+    player.removeItem(itemId, quantity);
+
+    if (!this.shippingBins.has(player.id)) this.shippingBins.set(player.id, []);
+    this.shippingBins.get(player.id).push({ itemId, quantity, quality });
+
+    this._sendInventoryUpdate(player.socketId, player);
+    return { itemId, quantity };
+  }
+
+  _processShippingBins() {
+    for (const [playerId, items] of this.shippingBins) {
+      // players Map is keyed by socketId, so find by persistent player id
+      let player = null;
+      for (const p of this.players.values()) {
+        if (p.id === playerId) { player = p; break; }
+      }
+      if (!player) continue;
+
+      let totalCoins = 0;
+      for (const item of items) {
+        const cropData = cropsData[item.itemId];
+        const fishItem = fishData[item.itemId];
+        const basePrice = cropData?.sellPrice || fishItem?.value || 10;
+        const multiplier = QUALITY_MULTIPLIER[item.quality] || 1;
+        totalCoins += Math.floor(basePrice * multiplier) * item.quantity;
+      }
+
+      if (totalCoins > 0) {
+        player.coins += totalCoins;
+        this._sendInventoryUpdate(player.socketId, player);
+        logger.info('SHIPPING', `Player ${player.name} earned ${totalCoins} coins from shipping bin`);
+      }
+    }
+    this.shippingBins.clear();
   }
 
   // --- Helpers ---

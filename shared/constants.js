@@ -82,6 +82,7 @@ export const ACTIONS = {
   CRAFT_COLLECT: 'craft:collect',
   SHOP_BUY: 'shop:buy',
   SHOP_SELL: 'shop:sell',
+  SHIP_ITEM: 'ship:item',
   WORLD_STATE: 'world:state',
   WORLD_UPDATE: 'world:update',
   TIME_UPDATE: 'time:update',
