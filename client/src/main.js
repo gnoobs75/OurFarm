@@ -188,6 +188,10 @@ async function main() {
           crops.dispose();
           crops.build(data.crops);
           break;
+        case 'playerCollapse':
+          console.log(`You collapsed! Lost ${data.penalty} coins.`);
+          // Could show a UI notification in the future
+          break;
       }
     });
 

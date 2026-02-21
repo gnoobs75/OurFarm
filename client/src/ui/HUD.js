@@ -1,5 +1,5 @@
 // client/src/ui/HUD.js
-// Heads-up display showing coins, XP, time, energy, toolbar.
+// Heads-up display showing coins, skills, time, energy, toolbar.
 
 import { SEASON_NAMES, WEATHER } from '@shared/constants.js';
 
@@ -16,8 +16,8 @@ export class HUD {
       <div class="hud-group" id="hud-stats">
         <div class="hud-item" id="hud-coins">Coins: 500</div>
         <div class="hud-item" id="hud-level">Lv 1</div>
-        <div class="hud-item" id="hud-xp">XP: 0</div>
         <div class="hud-item" id="hud-energy">Energy: 100</div>
+        <div class="hud-item" id="hud-skills"></div>
       </div>
       <div class="hud-group" id="hud-time">
         <div class="hud-item" id="hud-season">Spring</div>
@@ -51,8 +51,20 @@ export class HUD {
   updateStats(data) {
     if (data.coins !== undefined) document.getElementById('hud-coins').textContent = `Coins: ${data.coins}`;
     if (data.level !== undefined) document.getElementById('hud-level').textContent = `Lv ${data.level}`;
-    if (data.xp !== undefined) document.getElementById('hud-xp').textContent = `XP: ${data.xp}`;
-    if (data.energy !== undefined) document.getElementById('hud-energy').textContent = `Energy: ${Math.floor(data.energy)}`;
+    if (data.energy !== undefined) {
+      const max = data.maxEnergy || 100;
+      document.getElementById('hud-energy').textContent = `Energy: ${Math.floor(data.energy)}/${max}`;
+    }
+    if (data.skills) {
+      const el = document.getElementById('hud-skills');
+      if (el) {
+        const labels = { farming: 'Fa', fishing: 'Fi', mining: 'Mi', foraging: 'Fo', combat: 'Co' };
+        const text = Object.entries(data.skills)
+          .map(([name, s]) => `${labels[name] || name[0].toUpperCase()}:${s.level}`)
+          .join(' ');
+        el.textContent = text;
+      }
+    }
   }
 
   updateTime(data) {
