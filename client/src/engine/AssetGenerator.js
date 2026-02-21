@@ -583,33 +583,64 @@ export class AssetGenerator {
     const group = new THREE.Group();
     const { skinColor = 0xffcc99, shirtColor = 0x4488cc, hairColor = 0x332211 } = params;
 
+    // Body
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.25), this.getMaterial(shirtColor));
     body.position.y = 0.75;
     group.add(body);
 
+    // Head
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 5), this.getMaterial(skinColor));
     head.position.y = 1.2;
     group.add(head);
 
+    // Hair
     const hair = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 5), this.getMaterial(hairColor));
     hair.position.y = 1.28;
     hair.scale.set(1, 0.6, 1);
     group.add(hair);
 
+    // Legs — wrap each in a pivot so rotation swings from the hip
     const legGeo = new THREE.BoxGeometry(0.12, 0.4, 0.15);
     const legMat = this.getMaterial(0x334455);
-    for (const side of [-1, 1]) {
-      const leg = new THREE.Mesh(legGeo, legMat);
-      leg.position.set(side * 0.1, 0.2, 0);
-      group.add(leg);
-    }
 
+    const leftLegPivot = new THREE.Group();
+    leftLegPivot.position.set(-0.1, 0.4, 0); // hip height
+    const leftLeg = new THREE.Mesh(legGeo, legMat);
+    leftLeg.position.y = -0.2; // hang down from pivot
+    leftLegPivot.add(leftLeg);
+    group.add(leftLegPivot);
+
+    const rightLegPivot = new THREE.Group();
+    rightLegPivot.position.set(0.1, 0.4, 0);
+    const rightLeg = new THREE.Mesh(legGeo, legMat);
+    rightLeg.position.y = -0.2;
+    rightLegPivot.add(rightLeg);
+    group.add(rightLegPivot);
+
+    // Arms — wrap each in a pivot so rotation swings from the shoulder
     const armGeo = new THREE.BoxGeometry(0.1, 0.4, 0.12);
-    for (const side of [-1, 1]) {
-      const arm = new THREE.Mesh(armGeo, this.getMaterial(skinColor));
-      arm.position.set(side * 0.28, 0.75, 0);
-      group.add(arm);
-    }
+    const armMat = this.getMaterial(skinColor);
+
+    const leftArmPivot = new THREE.Group();
+    leftArmPivot.position.set(-0.28, 0.95, 0); // shoulder height
+    const leftArm = new THREE.Mesh(armGeo, armMat);
+    leftArm.position.y = -0.2; // hang down from pivot
+    leftArmPivot.add(leftArm);
+    group.add(leftArmPivot);
+
+    const rightArmPivot = new THREE.Group();
+    rightArmPivot.position.set(0.28, 0.95, 0);
+    const rightArm = new THREE.Mesh(armGeo, armMat);
+    rightArm.position.y = -0.2;
+    rightArmPivot.add(rightArm);
+    group.add(rightArmPivot);
+
+    // Store references for animation
+    group.userData.parts = {
+      body, head, hair,
+      leftLegPivot, rightLegPivot,
+      leftArmPivot, rightArmPivot,
+    };
 
     group.castShadow = true;
     return group;
