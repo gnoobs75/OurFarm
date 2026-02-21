@@ -140,6 +140,9 @@ export class GameWorld {
     // Advance time
     const timeEvents = this.time.tick(deltaSec);
 
+    // Check for 2 AM collapse
+    this._checkCollapse();
+
     // Calculate game hours elapsed this tick
     const gameHoursElapsed = (deltaSec * TIME_SCALE) / 3600;
 
@@ -172,7 +175,37 @@ export class GameWorld {
     }
   }
 
+  _checkCollapse() {
+    const hour = this.time.hour;
+    // 2 AM check — only trigger once when crossing the threshold
+    if (hour >= 2 && hour < 6) {
+      for (const player of this.players.values()) {
+        if (!player._collapsed) {
+          player._collapsed = true;
+          // Penalty: lose 10% coins (max 1000)
+          const penalty = Math.min(Math.floor(player.coins * 0.1), 1000);
+          player.coins -= penalty;
+          // Wake with 50% energy
+          player.energy = Math.floor(player.maxEnergy * 0.5);
+          this._sendInventoryUpdate(player.socketId, player);
+          // Broadcast collapse event to the specific player
+          if (this.io && player.socketId) {
+            this.io.to(player.socketId).emit(ACTIONS.WORLD_UPDATE, {
+              type: 'playerCollapse',
+              penalty,
+            });
+          }
+        }
+      }
+    }
+  }
+
   _onNewDay() {
+    // Reset collapse flag for all players
+    for (const player of this.players.values()) {
+      player._collapsed = false;
+    }
+
     logger.info('WORLD', `New day: Season ${this.time.season}, Day ${this.time.day}`, {
       crops: this.crops.size, animals: this.animals.size, players: this.players.size,
     });
