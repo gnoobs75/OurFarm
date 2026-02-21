@@ -479,19 +479,51 @@ export class GameWorld {
       return;
     }
 
-    const location = 'pond'; // Simplified — could check coordinates for river/ocean
-    const fish = this.fishCalc.rollCatch(location, player.level);
+    // Phase 1: Send cast confirmation with bobber position
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'fishCast',
+      playerId: player.id,
+      x: data.x,
+      z: data.z,
+    });
 
-    if (fish) {
-      player.addItem(fish.id, 1);
-      player.addSkillXP(SKILLS.FISHING, 5 + fish.rarity * 10);
-      logger.debug('FISH', `${player.name} caught ${fish.id} (rarity ${fish.rarity})`);
-      this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'fishCaught', playerId: player.id, fish });
-      this._sendInventoryUpdate(socketId, player);
-    } else {
-      logger.debug('FISH', `${player.name} missed (no fish available at ${location})`);
-      this.io.emit(ACTIONS.WORLD_UPDATE, { type: 'fishMiss', playerId: player.id });
-    }
+    // Phase 2: After random delay (1.5-4s), resolve the catch
+    const biteDelay = 1500 + Math.random() * 2500;
+    setTimeout(() => {
+      if (!this.players.has(socketId)) return;
+
+      const location = 'pond';
+      const fish = this.fishCalc.rollCatch(location, player.level);
+
+      // Send bite event
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+        type: 'fishBite',
+        playerId: player.id,
+        x: data.x,
+        z: data.z,
+      });
+
+      // Auto-resolve after bite animation
+      setTimeout(() => {
+        if (!this.players.has(socketId)) return;
+
+        if (fish) {
+          player.addItem(fish.id, 1);
+          player.addSkillXP(SKILLS.FISHING, 5 + fish.rarity * 10);
+          logger.debug('FISH', `${player.name} caught ${fish.id} (rarity ${fish.rarity})`);
+          this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+            type: 'fishCaught', playerId: player.id, fish,
+            x: data.x, z: data.z,
+          });
+          this._sendInventoryUpdate(socketId, player);
+        } else {
+          logger.debug('FISH', `${player.name} missed (no fish available at ${location})`);
+          this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+            type: 'fishMiss', playerId: player.id,
+          });
+        }
+      }, 500);
+    }, biteDelay);
   }
 
   handleNPCTalk(socketId, data) {

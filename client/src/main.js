@@ -21,6 +21,7 @@ import { InventoryUI } from './ui/Inventory.js';
 import { DialogueUI } from './ui/DialogueUI.js';
 import { DebugWindow } from './ui/DebugWindow.js';
 import { ShopUI } from './ui/ShopUI.js';
+import { FishingEffects } from './effects/FishingEffects.js';
 import { tileToWorld } from '@shared/TileMap.js';
 import { TILE_TYPES } from '@shared/constants.js';
 import { debugClient } from './utils/DebugClient.js';
@@ -53,6 +54,7 @@ async function main() {
   const shopUI = new ShopUI();
   shopUI.onBuy = (itemId, qty) => network.sendBuy(itemId, qty);
   shopUI.onSell = (itemId, qty) => network.sendSell(itemId, qty);
+  const fishingFx = new FishingEffects(sceneManager.scene);
 
   // --- Network ---
   const network = new NetworkClient();
@@ -189,10 +191,26 @@ async function main() {
         case 'cropHarvested':
           crops.removeCrop(data.cropId);
           break;
+        case 'fishCast':
+          if (data.playerId === network.playerId) {
+            fishingFx.cast(data.x, data.z);
+          }
+          break;
+        case 'fishBite':
+          if (data.playerId === network.playerId) {
+            fishingFx.bite();
+          }
+          break;
         case 'fishCaught':
-          console.log('Caught:', data.fish.name);
+          if (data.playerId === network.playerId) {
+            fishingFx.catchResult(true);
+          }
+          console.log('Caught:', data.fish.name || data.fish.id);
           break;
         case 'fishMiss':
+          if (data.playerId === network.playerId) {
+            fishingFx.catchResult(false);
+          }
           console.log('The fish got away...');
           break;
         case 'npcDialogue':
@@ -245,6 +263,7 @@ async function main() {
       npcs.update(delta);
       pets.update(delta);
       animals.update(delta);
+      fishingFx.update(delta);
 
       // Debug window
       debugWindow.update(delta);
