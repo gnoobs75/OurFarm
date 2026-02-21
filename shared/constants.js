@@ -65,10 +65,16 @@ export const COLORS = {
   SAND: 0xe8d68c,
 };
 
+export const MAP_IDS = {
+  FARM: 'farm',
+  TOWN: 'town',
+};
+
 export const ACTIONS = {
   PLAYER_MOVE: 'player:move',
   PLAYER_JOIN: 'player:join',
   PLAYER_LEAVE: 'player:leave',
+  MAP_TRANSITION: 'map:transition',
   FARM_TILL: 'farm:till',
   FARM_PLANT: 'farm:plant',
   FARM_WATER: 'farm:water',
@@ -120,4 +126,12 @@ export const QUALITY_MULTIPLIER = {
   1: 1.25,
   2: 1.5,
   3: 2.0,
+};
+
+export const GIFT_POINTS = {
+  LOVED: 80,
+  LIKED: 45,
+  NEUTRAL: 20,
+  DISLIKED: -20,
+  HATED: -40,
 };

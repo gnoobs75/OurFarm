@@ -12,6 +12,7 @@ import { CropRenderer } from './world/CropRenderer.js';
 import { WeatherRenderer } from './world/WeatherRenderer.js';
 import { BuildingRenderer } from './world/BuildingRenderer.js';
 import { DecorationRenderer } from './world/DecorationRenderer.js';
+import { AmbientCreatureRenderer } from './world/AmbientCreatureRenderer.js';
 import { PlayerRenderer } from './entities/PlayerRenderer.js';
 import { NPCRenderer } from './entities/NPCRenderer.js';
 import { PetRenderer } from './entities/PetRenderer.js';
@@ -20,6 +21,7 @@ import { HUD } from './ui/HUD.js';
 import { InventoryUI } from './ui/Inventory.js';
 import { DialogueUI } from './ui/DialogueUI.js';
 import { DebugWindow } from './ui/DebugWindow.js';
+import { getToolAction, isSeed } from './ui/ItemIcons.js';
 import { tileToWorld } from '@shared/TileMap.js';
 import { TILE_TYPES } from '@shared/constants.js';
 import { debugClient } from './utils/DebugClient.js';
@@ -49,6 +51,20 @@ async function main() {
   const dialogueUI = new DialogueUI(document.getElementById('dialogue-panel'));
   const debugWindow = new DebugWindow();
   debugWindow.setRenderer(sceneManager.renderer);
+
+  // Wire backpack right-click → action bar quick-add
+  inventoryUI.onQuickAdd = (itemId) => {
+    hud.addToFirstEmptySlot(itemId);
+  };
+
+  // Wire gift-giving flow
+  dialogueUI.onGiftRequest = (npcId) => {
+    const activeItem = hud.getActiveItem();
+    if (activeItem && activeItem.itemId) {
+      network.sendNPCGift(npcId, activeItem.itemId);
+      dialogueUI.hide();
+    }
+  };
 
   // --- Network ---
   const network = new NetworkClient();
@@ -80,6 +96,9 @@ async function main() {
     buildings.build(state.buildings);
     decorations.build(state.decorations || []);
 
+    // Ambient creatures (client-side only)
+    let creatures = new AmbientCreatureRenderer(sceneManager.scene, state.tiles);
+
     // Add players
     for (const p of state.players) {
       players.addPlayer(p, p.id === state.playerId);
@@ -89,69 +108,73 @@ async function main() {
     const localPlayer = state.players.find(p => p.id === state.playerId);
     if (localPlayer) {
       hud.updateStats(localPlayer);
+      hud.initActionBar(localPlayer.inventory);
       inventoryUI.update(localPlayer.inventory);
     }
     hud.updateTime(state.time);
     hud.updateWeather(state.weather.weather);
+    hud.updateMap(state.mapId || 'farm');
 
     // Center camera on player
     if (localPlayer) {
       sceneManager.panTo(localPlayer.x, localPlayer.z);
     }
 
-    // --- Current tool state ---
-    let activeTool = 0;
-    const toolActions = ['hoe', 'watering_can', 'pickaxe', 'axe', 'fishing_rod', 'seeds'];
-    let selectedSeed = 'wheat';
-
-    hud.onSlotSelect = (slot) => {
-      activeTool = slot;
-    };
-
-    // --- Handle tile clicks ---
-    input.on('tileClick', ({ tile, worldPos, button }) => {
+    // --- Right-click: Move player ---
+    input.on('tileMove', ({ tile, worldPos }) => {
       if (dialogueUI.visible) return;
 
-      // Right-click or check for NPC
+      // Check for NPC first
       const npcId = npcs.getNPCAtPosition(worldPos.x, worldPos.z);
       if (npcId) {
         network.sendNPCTalk(npcId);
         return;
       }
 
-      // Move player to clicked position
       network.sendMove(worldPos.x, worldPos.z);
+    });
 
-      // Perform tool action
-      const tool = toolActions[activeTool];
-      switch (tool) {
+    // --- Left-click: Perform tool/item action ---
+    input.on('tileAction', ({ tile, worldPos }) => {
+      if (dialogueUI.visible) return;
+
+      const activeItem = hud.getActiveItem();
+      if (!activeItem) return;
+
+      const action = getToolAction(activeItem.itemId);
+      if (!action) return;
+
+      switch (action) {
         case 'hoe':
           network.sendTill(tile.x, tile.z);
           break;
         case 'watering_can':
           network.sendWater(tile.x, tile.z);
           break;
-        case 'seeds':
-          network.sendPlant(tile.x, tile.z, selectedSeed);
+        case 'seeds': {
+          const seedType = activeItem.itemId.replace('_seed', '');
+          network.sendPlant(tile.x, tile.z, seedType);
           break;
+        }
         case 'fishing_rod':
           network.sendFishCast(worldPos.x, worldPos.z);
           break;
         case 'pickaxe':
-          // Harvest if there's a crop, else mine
           network.sendHarvest(tile.x, tile.z);
           break;
       }
 
       // Queue the tool animation on the local player
-      players.queueAction(network.playerId, tool);
+      players.queueAction(network.playerId, action);
     });
 
     // --- Keyboard shortcuts ---
     input.on('keyDown', ({ key }) => {
-      if (key === 'e' || key === 'E') inventoryUI.toggle();
+      if (key === 'i' || key === 'I') inventoryUI.toggle();
       if (key === 'F3') debugWindow.toggle();
-      if (key >= '1' && key <= '6') hud.selectSlot(parseInt(key) - 1);
+      // Keys 1-9 select action bar slots 0-8, 0 selects slot 9
+      if (key >= '1' && key <= '9') hud.selectSlot(parseInt(key) - 1);
+      if (key === '0') hud.selectSlot(9);
     });
 
     // --- Network event handlers ---
@@ -170,7 +193,6 @@ async function main() {
           crops.addCrop(data.crop);
           break;
         case 'cropWatered':
-          // Visual feedback could be added here
           break;
         case 'cropUpdate':
           crops.updateCrop(data.crop);
@@ -185,6 +207,7 @@ async function main() {
           console.log('The fish got away...');
           break;
         case 'npcDialogue':
+          dialogueUI._npcId = data.npcId;
           dialogueUI.show(data.npcName, data.text);
           break;
         case 'fullSync':
@@ -193,8 +216,36 @@ async function main() {
           break;
         case 'playerCollapse':
           console.log(`You collapsed! Lost ${data.penalty} coins.`);
-          // Could show a UI notification in the future
           break;
+        case 'mapTransition': {
+          // Rebuild world from new map state
+          const ms = data.mapState;
+          terrain.dispose();
+          terrain.build(ms.tiles, data.season || 0);
+          water.dispose();
+          water.build(ms.tiles);
+          decorations.dispose();
+          decorations.build(ms.decorations || []);
+          creatures.dispose();
+          creatures = new AmbientCreatureRenderer(sceneManager.scene, ms.tiles);
+          buildings.dispose();
+          buildings.build(ms.buildings || []);
+          crops.dispose();
+          crops.build(ms.crops || []);
+          npcs.dispose();
+          npcs.build(ms.npcs || []);
+          pets.dispose();
+          pets.build(ms.pets || []);
+          animals.dispose();
+          animals.build(ms.animals || []);
+
+          // Reposition player
+          if (data.spawnX !== undefined) {
+            sceneManager.panTo(data.spawnX, data.spawnZ);
+          }
+          hud.updateMap(data.mapId);
+          break;
+        }
       }
     });
 
@@ -205,6 +256,7 @@ async function main() {
     });
     network.on('inventoryUpdate', (data) => {
       hud.updateStats(data);
+      hud.syncQuantities(data.inventory);
       inventoryUI.update(data.inventory);
     });
     network.on('playerJoin', (data) => {
@@ -219,6 +271,7 @@ async function main() {
       water.update(delta);
       crops.update(delta);
       decorations.update(delta);
+      creatures.update(delta, sceneManager.cameraTarget);
       weather.update(delta, sceneManager.cameraTarget);
       players.update(delta);
       npcs.update(delta);

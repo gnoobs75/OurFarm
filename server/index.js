@@ -55,13 +55,13 @@ app.post('/api/debug/client-error', (req, res) => {
 app.get('/api/debug/state', (req, res) => {
   res.json({
     players: Array.from(world.players.values()).map(p => p.getState()),
-    crops: world.crops.size,
-    animals: world.animals.size,
-    pets: world.pets.size,
-    npcs: world.npcs.length,
+    maps: world.maps.size,
+    farmCrops: world.maps.get('farm')?.crops.size,
+    farmAnimals: world.maps.get('farm')?.animals.size,
+    farmPets: world.maps.get('farm')?.pets.size,
+    townNpcs: world.maps.get('town')?.npcs.length,
     time: world.time?.getState(),
     weather: world.weather?.getState(),
-    tileCount: world.tiles?.length,
   });
 });
 
@@ -101,7 +101,11 @@ app.get('/api/debug/logs/:filename', (req, res) => {
 // Create game world
 logger.info('SERVER', 'Initializing GameWorld...');
 const world = new GameWorld(io);
-logger.info('SERVER', 'GameWorld initialized', { tiles: world.tiles.length, npcs: world.npcs.length });
+logger.info('SERVER', 'GameWorld initialized', {
+  maps: world.maps.size,
+  farmTiles: world.maps.get('farm')?.tiles.length,
+  townNpcs: world.maps.get('town')?.npcs.length,
+});
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
@@ -142,6 +146,7 @@ io.on('connection', (socket) => {
 
   // NPC interaction
   wrap(ACTIONS.NPC_TALK, (data) => world.handleNPCTalk(socket.id, data));
+  wrap(ACTIONS.NPC_GIFT, (data) => world.handleNPCGift(socket.id, data));
 
   // Shop
   wrap(ACTIONS.SHOP_BUY, (data) => world.handleShopBuy(socket.id, data));
