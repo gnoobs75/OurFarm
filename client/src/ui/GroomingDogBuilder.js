@@ -306,6 +306,19 @@ export function buildGroomingDog(petData) {
     if (child.isMesh) child.castShadow = true;
   });
 
+  // ─── Cosmetic attach points ────────────────────────────────────
+  const hatAttach = new THREE.Object3D();
+  hatAttach.position.set(0, hs * 0.95, 0); // top of head
+  head.add(hatAttach);
+
+  const neckAttach = new THREE.Object3D();
+  neckAttach.position.set(0, -bs * 0.3, bs * cfg.bodyScaleZ * 0.65); // below chin, front of body
+  body.add(neckAttach);
+
+  const backAttach = new THREE.Object3D();
+  backAttach.position.set(0, bs * 0.85, -bs * 0.1); // on upper back
+  body.add(backAttach);
+
   // ─── Named parts ────────────────────────────────────────────────
   const parts = {
     body,
@@ -320,6 +333,9 @@ export function buildGroomingDog(petData) {
     tongue,
     tail: tailSegs,
     legs,
+    hatAttach,
+    neckAttach,
+    backAttach,
   };
 
   // ─── Zone meshes (invisible raycast targets) ────────────────────
@@ -387,4 +403,198 @@ export function buildGroomingDog(petData) {
   );
 
   return { group, parts, zones };
+}
+
+// ─── Cosmetic Mesh Builder ───────────────────────────────────────
+// Returns a THREE.Group containing simple geometry for the given cosmetic ID.
+// Each cosmetic is sized to be proportional to the grooming dog model.
+
+const COSMETIC_BUILDERS = {
+  // ── Hats (attach to hatAttach) ──────────────────────────────────
+  straw_hat() {
+    const g = new THREE.Group();
+    const brim = new THREE.Mesh(cylinder(0.14, 0.14, 0.015, 12), mat(0xdaa520));
+    g.add(brim);
+    const crown = new THREE.Mesh(cylinder(0.07, 0.07, 0.06, 8), mat(0xdaa520));
+    crown.position.y = 0.038;
+    g.add(crown);
+    return g;
+  },
+
+  party_hat() {
+    const g = new THREE.Group();
+    const c = new THREE.Mesh(cone(0.06, 0.12, 8), mat(0xcc2222));
+    c.position.y = 0.06;
+    g.add(c);
+    return g;
+  },
+
+  flower_wreath() {
+    const g = new THREE.Group();
+    const geo = new THREE.TorusGeometry(0.08, 0.015, 6, 12);
+    const t = new THREE.Mesh(geo, mat(0x44aa44));
+    t.rotation.x = Math.PI / 2;
+    g.add(t);
+    return g;
+  },
+
+  cowboy_hat() {
+    const g = new THREE.Group();
+    const brim = new THREE.Mesh(cylinder(0.16, 0.16, 0.012, 12), mat(0x8B4513));
+    g.add(brim);
+    const crown = new THREE.Mesh(cylinder(0.06, 0.07, 0.08, 8), mat(0x8B4513));
+    crown.position.y = 0.046;
+    g.add(crown);
+    return g;
+  },
+
+  crown() {
+    const g = new THREE.Group();
+    const band = new THREE.Mesh(cylinder(0.07, 0.07, 0.03, 8), mat(0xffd700));
+    g.add(band);
+    // 5 spikes around the top
+    for (let i = 0; i < 5; i++) {
+      const angle = (i / 5) * Math.PI * 2;
+      const spike = new THREE.Mesh(cone(0.012, 0.035, 4), mat(0xffd700));
+      spike.position.set(
+        Math.cos(angle) * 0.055,
+        0.032,
+        Math.sin(angle) * 0.055,
+      );
+      g.add(spike);
+    }
+    return g;
+  },
+
+  // ── Neck (attach to neckAttach) ─────────────────────────────────
+  red_bandana() {
+    const g = new THREE.Group();
+    const b = new THREE.Mesh(box(0.12, 0.04, 0.015), mat(0xcc0000));
+    // Slight rotation for triangle effect
+    b.rotation.z = 0.1;
+    g.add(b);
+    return g;
+  },
+
+  bow_tie() {
+    const g = new THREE.Group();
+    const left = new THREE.Mesh(cone(0.025, 0.05, 5), mat(0x111111));
+    left.rotation.z = Math.PI / 2;
+    left.position.x = -0.025;
+    g.add(left);
+    const right = new THREE.Mesh(cone(0.025, 0.05, 5), mat(0x111111));
+    right.rotation.z = -Math.PI / 2;
+    right.position.x = 0.025;
+    g.add(right);
+    return g;
+  },
+
+  bell_collar() {
+    const g = new THREE.Group();
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.06, 0.008, 6, 12),
+      mat(0xdaa520),
+    );
+    ring.rotation.x = Math.PI / 2;
+    g.add(ring);
+    const bell = new THREE.Mesh(sphere(0.015, 6, 5), mat(0xffd700));
+    bell.position.y = -0.02;
+    g.add(bell);
+    return g;
+  },
+
+  flower_lei() {
+    const g = new THREE.Group();
+    const geo = new THREE.TorusGeometry(0.07, 0.012, 6, 12);
+    const t = new THREE.Mesh(geo, mat(0xff69b4));
+    t.rotation.x = Math.PI / 2;
+    g.add(t);
+    return g;
+  },
+
+  scarf() {
+    const g = new THREE.Group();
+    const s = new THREE.Mesh(box(0.14, 0.03, 0.015), mat(0x3366cc));
+    g.add(s);
+    // Hanging tail
+    const tail = new THREE.Mesh(box(0.025, 0.06, 0.012), mat(0x3366cc));
+    tail.position.set(0.05, -0.04, 0.005);
+    g.add(tail);
+    return g;
+  },
+
+  // ── Back (attach to backAttach) ─────────────────────────────────
+  cape() {
+    const g = new THREE.Group();
+    const c = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.18, 0.22),
+      mat(0x6622aa, { side: THREE.DoubleSide }),
+    );
+    c.rotation.x = -0.3; // drape slightly backward
+    c.position.y = -0.05;
+    g.add(c);
+    return g;
+  },
+
+  backpack() {
+    const g = new THREE.Group();
+    const b = new THREE.Mesh(box(0.07, 0.07, 0.05), mat(0x8B4513));
+    g.add(b);
+    return g;
+  },
+
+  angel_wings() {
+    const g = new THREE.Group();
+    const wingMat = mat(0xffffff, { side: THREE.DoubleSide });
+    const leftW = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.14), wingMat);
+    leftW.position.set(-0.06, 0, 0);
+    leftW.rotation.y = 0.4;
+    g.add(leftW);
+    const rightW = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.14), wingMat);
+    rightW.position.set(0.06, 0, 0);
+    rightW.rotation.y = -0.4;
+    g.add(rightW);
+    return g;
+  },
+
+  butterfly_wings() {
+    const g = new THREE.Group();
+    const colors = [0xff6699, 0x66ccff, 0xffcc33, 0x66ff99];
+    const wingMat = mat(colors[Math.floor(Math.random() * colors.length)], {
+      side: THREE.DoubleSide,
+    });
+    const leftW = new THREE.Mesh(new THREE.PlaneGeometry(0.07, 0.10), wingMat);
+    leftW.position.set(-0.045, 0, 0);
+    leftW.rotation.y = 0.5;
+    g.add(leftW);
+    const rightW = new THREE.Mesh(new THREE.PlaneGeometry(0.07, 0.10), wingMat);
+    rightW.position.set(0.045, 0, 0);
+    rightW.rotation.y = -0.5;
+    g.add(rightW);
+    return g;
+  },
+
+  saddle() {
+    const g = new THREE.Group();
+    const seat = new THREE.Mesh(box(0.10, 0.02, 0.12), mat(0x3e2723));
+    g.add(seat);
+    // Raised front pommel
+    const pommel = new THREE.Mesh(box(0.04, 0.03, 0.02), mat(0x3e2723));
+    pommel.position.set(0, 0.02, 0.05);
+    g.add(pommel);
+    return g;
+  },
+};
+
+/**
+ * Build a simple Three.js mesh group for a cosmetic item.
+ * @param {string} cosmeticId — e.g. 'straw_hat', 'cape', etc.
+ * @returns {THREE.Group|null}
+ */
+export function buildCosmeticMesh(cosmeticId) {
+  const builder = COSMETIC_BUILDERS[cosmeticId];
+  if (!builder) return null;
+  const mesh = builder();
+  mesh.userData.cosmeticId = cosmeticId;
+  return mesh;
 }

@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { MOUSE } from 'three';
 import { GroomingScene3D } from './GroomingScene3D.js';
 import { GroomingDogAnimator } from './GroomingDogAnimator.js';
+import { buildCosmeticMesh } from './GroomingDogBuilder.js';
 
 // ─── Zone names produced by GroomingDogBuilder ───────────────────
 const ZONE_NAMES = ['head', 'body-left', 'body-right', 'back', 'belly', 'legs'];
@@ -31,6 +32,26 @@ const SLOW_TIME  = 28;
 // ─── Brush phase constants ──────────────────────────────────────
 const BRUSH_STROKES_NEEDED = 14;
 const BRUSH_MIN_DX = 20; // minimum pixel delta to count as a stroke
+
+// ─── Cosmetic slot mapping ──────────────────────────────────────
+const SLOT_MAP = {
+  straw_hat: 'hat', party_hat: 'hat', flower_wreath: 'hat', cowboy_hat: 'hat', crown: 'hat',
+  red_bandana: 'neck', bow_tie: 'neck', bell_collar: 'neck', flower_lei: 'neck', scarf: 'neck',
+  cape: 'back', backpack: 'back', angel_wings: 'back', butterfly_wings: 'back', saddle: 'back',
+};
+
+// ─── Cosmetic emoji mapping (for 2D button display) ─────────────
+const COSMETIC_EMOJI = {
+  straw_hat: '\uD83D\uDC52', party_hat: '\uD83C\uDF89', flower_wreath: '\uD83C\uDF3B',
+  cowboy_hat: '\uD83E\uDD20', crown: '\uD83D\uDC51',
+  red_bandana: '\uD83E\uDDE3', bow_tie: '\uD83C\uDF80', bell_collar: '\uD83D\uDD14',
+  flower_lei: '\uD83C\uDF3A', scarf: '\uD83E\uDDE3',
+  cape: '\uD83E\uDDE5', backpack: '\uD83C\uDF92', angel_wings: '\uD83D\uDC7C',
+  butterfly_wings: '\uD83E\uDD8B', saddle: '\uD83E\uDE79',
+};
+
+// ─── Attach-point name per slot ─────────────────────────────────
+const SLOT_ATTACH = { hat: 'hatAttach', neck: 'neckAttach', back: 'backAttach' };
 
 // ─── Particle type colours & behaviours ─────────────────────────
 const PARTICLE_DEFS = {
@@ -56,6 +77,8 @@ export class GroomingUI3D {
     // 3D subsystems (created in start())
     this._scene3D = null;
     this._animator = null;
+    this._dogParts = null;
+    this._equippedMeshes = { hat: null, neck: null, back: null };
 
     // Particle pool
     this._particles = [];
@@ -205,6 +228,7 @@ export class GroomingUI3D {
 
     // Load the dog model
     const { parts } = this._scene3D.loadDog(this._petData);
+    this._dogParts = parts;
 
     // Create animator
     this._animator = new GroomingDogAnimator(parts);
@@ -507,8 +531,9 @@ export class GroomingUI3D {
     const stars = this._totalScore >= 12 ? 3 : this._totalScore >= 7 ? 2 : 1;
     this._showStars(stars);
 
+    const equipped = await this._dressupPhase();
     await this._showResult(stars);
-    this._endGame(stars);
+    this._endGameWithEquipped(stars, equipped);
   }
 
   // ─── Phase: Wash ────────────────────────────────────────────
@@ -810,6 +835,159 @@ export class GroomingUI3D {
     this._hintEl.textContent = `Brush ${this._brushDir}! ${arrow}`;
   }
 
+  // ─── Phase: Dress-Up ──────────────────────────────────────────
+
+  _dressupPhase() {
+    return new Promise((resolve) => {
+      // Keep orbit controls enabled for admiring
+      this._phaseLabel.textContent = '\uD83C\uDFA8 Dress Up';
+      this._hintEl.textContent = 'Pick accessories for your pet!';
+      this._toolCursor.style.display = 'none';
+
+      // Hide progress bar, show dress-up area
+      const progressArea = this._container.querySelector('.groom-progress-area');
+      if (progressArea) progressArea.style.display = 'none';
+
+      this._dressupArea.classList.remove('hidden');
+
+      // Track currently equipped cosmetics
+      const equipped = { hat: null, neck: null, back: null };
+
+      // Pre-equip from petData if available
+      const preEquipped = this._petData.cosmetics?.equipped;
+      if (preEquipped) {
+        for (const slot of ['hat', 'neck', 'back']) {
+          if (preEquipped[slot]) {
+            equipped[slot] = preEquipped[slot];
+            this._attachCosmeticMesh(preEquipped[slot], slot);
+          }
+        }
+      }
+
+      // Get unlocked cosmetics
+      const unlocked = this._petData.cosmetics?.unlocked || [];
+
+      // Build the dress-up HTML
+      this._dressupArea.innerHTML = `
+        <div class="groom-dressup-slots"></div>
+        <div class="groom-dressup-tray"></div>
+        <button class="groom-dressup-done">Done \u2714\uFE0F</button>
+      `;
+
+      const slotsContainer = this._dressupArea.querySelector('.groom-dressup-slots');
+      const trayContainer = this._dressupArea.querySelector('.groom-dressup-tray');
+      const doneBtn = this._dressupArea.querySelector('.groom-dressup-done');
+
+      // Render slot buttons
+      const renderSlots = () => {
+        slotsContainer.innerHTML = '';
+        for (const slot of ['hat', 'neck', 'back']) {
+          const btn = document.createElement('button');
+          btn.className = 'groom-slot-btn';
+          btn.dataset.slot = slot;
+          const id = equipped[slot];
+          btn.textContent = id ? (COSMETIC_EMOJI[id] || id) : '\u2795';
+          btn.title = slot.charAt(0).toUpperCase() + slot.slice(1);
+
+          // Click equipped slot to unequip
+          btn.addEventListener('click', () => {
+            if (equipped[slot]) {
+              this._removeCosmeticMesh(slot);
+              equipped[slot] = null;
+              renderSlots();
+            }
+          });
+
+          slotsContainer.appendChild(btn);
+          // Label below
+          const label = document.createElement('span');
+          label.className = 'groom-slot-label';
+          label.textContent = slot;
+          slotsContainer.appendChild(label);
+        }
+      };
+
+      // Render item tray
+      const renderTray = () => {
+        trayContainer.innerHTML = '';
+        for (const cosmeticId of unlocked) {
+          const slot = SLOT_MAP[cosmeticId];
+          if (!slot) continue;
+
+          const btn = document.createElement('button');
+          btn.className = 'groom-tray-item';
+          if (equipped[slot] === cosmeticId) btn.classList.add('equipped');
+          btn.textContent = COSMETIC_EMOJI[cosmeticId] || cosmeticId;
+          btn.title = cosmeticId.replace(/_/g, ' ');
+
+          btn.addEventListener('click', () => {
+            if (equipped[slot] === cosmeticId) {
+              // Toggle off
+              this._removeCosmeticMesh(slot);
+              equipped[slot] = null;
+            } else {
+              // Remove previous in this slot
+              if (equipped[slot]) {
+                this._removeCosmeticMesh(slot);
+              }
+              // Attach new
+              equipped[slot] = cosmeticId;
+              this._attachCosmeticMesh(cosmeticId, slot);
+            }
+            renderSlots();
+            renderTray();
+          });
+
+          trayContainer.appendChild(btn);
+        }
+      };
+
+      renderSlots();
+      renderTray();
+
+      // Done button resolves
+      doneBtn.addEventListener('click', () => {
+        this._dressupArea.classList.add('hidden');
+        this._dressupArea.innerHTML = '';
+        if (progressArea) progressArea.style.display = '';
+        resolve(equipped);
+      });
+    });
+  }
+
+  /**
+   * Attach a cosmetic 3D mesh to the correct attach point on the dog.
+   * @param {string} cosmeticId
+   * @param {string} slot — 'hat', 'neck', or 'back'
+   */
+  _attachCosmeticMesh(cosmeticId, slot) {
+    if (!this._dogParts) return;
+    // Remove existing mesh in this slot
+    this._removeCosmeticMesh(slot);
+
+    const mesh = buildCosmeticMesh(cosmeticId);
+    if (!mesh) return;
+
+    const attachName = SLOT_ATTACH[slot];
+    const attachPoint = this._dogParts[attachName];
+    if (!attachPoint) return;
+
+    attachPoint.add(mesh);
+    this._equippedMeshes[slot] = mesh;
+  }
+
+  /**
+   * Remove the cosmetic 3D mesh from a slot.
+   * @param {string} slot — 'hat', 'neck', or 'back'
+   */
+  _removeCosmeticMesh(slot) {
+    const mesh = this._equippedMeshes[slot];
+    if (mesh && mesh.parent) {
+      mesh.parent.remove(mesh);
+    }
+    this._equippedMeshes[slot] = null;
+  }
+
   // ─── Result & End ───────────────────────────────────────────
 
   _showResult(stars) {
@@ -854,6 +1032,47 @@ export class GroomingUI3D {
           this._scene3D = null;
         }
         this._animator = null;
+
+        if (this._boundResize) {
+          window.removeEventListener('resize', this._boundResize);
+          this._boundResize = null;
+        }
+
+        if (this._container && this._container.parentNode) {
+          this._container.parentNode.removeChild(this._container);
+        }
+        this._container = null;
+      }, 400);
+    }, 500);
+  }
+
+  /**
+   * End the game with equipped cosmetics from the dress-up phase.
+   * Used by the main phase flow (as opposed to dispose() fallback via _endGame).
+   */
+  _endGameWithEquipped(stars, equipped) {
+    this._running = false;
+
+    if (this._resolve) {
+      this._resolve({ stars, equipped: { ...equipped } });
+      this._resolve = null;
+    }
+
+    // Animate out
+    setTimeout(() => {
+      if (this._container) {
+        this._container.classList.remove('groom-overlay-visible');
+        this._container.classList.add('groom-overlay-exit');
+      }
+      setTimeout(() => {
+        // Dispose 3D resources
+        if (this._scene3D) {
+          this._scene3D.dispose();
+          this._scene3D = null;
+        }
+        this._animator = null;
+        this._dogParts = null;
+        this._equippedMeshes = { hat: null, neck: null, back: null };
 
         if (this._boundResize) {
           window.removeEventListener('resize', this._boundResize);
