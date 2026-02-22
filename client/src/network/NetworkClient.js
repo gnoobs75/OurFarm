@@ -68,7 +68,8 @@ export class NetworkClient {
   sendWater(tileX, tileZ) { this.socket.emit(ACTIONS.FARM_WATER, { x: tileX, z: tileZ }); }
   sendHarvest(tileX, tileZ) { this.socket.emit(ACTIONS.FARM_HARVEST, { x: tileX, z: tileZ }); }
   sendFishCast(x, z) { this.socket.emit(ACTIONS.FISH_CAST, { x, z }); }
-  sendFishReel() { this.socket.emit(ACTIONS.FISH_REEL); }
+  sendFishReel(success) { this.socket.emit(ACTIONS.FISH_REEL, { success }); }
+  sendFishCancel() { this.socket.emit(ACTIONS.FISH_REEL, { success: false }); }
   sendNPCTalk(npcId) { this.socket.emit(ACTIONS.NPC_TALK, { npcId }); }
   sendNPCGift(npcId, itemId) { this.socket.emit(ACTIONS.NPC_GIFT, { npcId, itemId }); }
   sendPetInteract(petId, action) { this.socket.emit(ACTIONS.PET_INTERACT, { petId, action }); }
