@@ -85,7 +85,9 @@ export class InputManager {
     if (worldPos) {
       const tile = worldToTile(worldPos.x, worldPos.z);
       this.hoveredTile = tile;
-      this._emit('tileHover', tile);
+      this.hoveredWorldPos = worldPos;
+      this.hoveredScreenPos = pos;
+      this._emit('tileHover', { tile, worldPos, screenPos: pos });
     }
   }
 

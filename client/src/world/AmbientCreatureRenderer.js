@@ -64,7 +64,7 @@ export class AmbientCreatureRenderer {
       const group = new THREE.Group();
 
       const wingGeo = new THREE.PlaneGeometry(0.08, 0.03);
-      const mat = new THREE.MeshLambertMaterial({ color, flatShading: true, side: THREE.DoubleSide });
+      const mat = new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide });
 
       const leftWing = new THREE.Mesh(wingGeo, mat);
       leftWing.position.set(-0.03, 0, 0);
@@ -199,7 +199,7 @@ export class AmbientCreatureRenderer {
       const color = BUTTERFLY_COLORS[i % BUTTERFLY_COLORS.length];
 
       const group = new THREE.Group();
-      const mat = new THREE.MeshLambertMaterial({ color, flatShading: true, side: THREE.DoubleSide });
+      const mat = new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide });
 
       // Two tiny wing planes
       const wingGeo = new THREE.PlaneGeometry(0.04, 0.03);
@@ -293,8 +293,8 @@ export class AmbientCreatureRenderer {
     const count = Math.min(FISH_SPOT_COUNT, this._waterTiles.length);
     if (count === 0) return;
 
-    const fishMat = new THREE.MeshLambertMaterial({ color: 0x8899bb, flatShading: true });
-    const splashMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true, transparent: true, opacity: 0.8 });
+    const fishMat = new THREE.MeshPhongMaterial({ color: 0x8899bb });
+    const splashMat = new THREE.MeshPhongMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
 
     for (let i = 0; i < count; i++) {
       const tile = this._waterTiles[Math.floor(Math.random() * this._waterTiles.length)];

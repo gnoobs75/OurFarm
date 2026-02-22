@@ -24,13 +24,13 @@ export class ForageRenderer {
 
     // Small plant/mushroom shape
     const stemGeo = new THREE.CylinderGeometry(0.01, 0.015, 0.06, 4);
-    const stemMat = new THREE.MeshLambertMaterial({ color: 0x228B22, flatShading: true });
+    const stemMat = new THREE.MeshPhongMaterial({ color: 0x228B22 });
     const stem = new THREE.Mesh(stemGeo, stemMat);
     stem.position.y = 0.03;
     group.add(stem);
 
     const topGeo = new THREE.SphereGeometry(0.04, 6, 4);
-    const topMat = new THREE.MeshLambertMaterial({ color, flatShading: true });
+    const topMat = new THREE.MeshPhongMaterial({ color });
     const top = new THREE.Mesh(topGeo, topMat);
     top.position.y = 0.07;
     group.add(top);

@@ -14,7 +14,7 @@ export class NetworkClient {
   }
 
   /** Connect to the game server */
-  connect(playerName = 'Farmer') {
+  connect(playerName = 'Farmer', appearance = {}) {
     return new Promise((resolve, reject) => {
       this.socket = io(window.location.origin, {
         transports: ['websocket'],
@@ -26,7 +26,7 @@ export class NetworkClient {
       this.socket.on('connect', () => {
         this.connected = true;
         console.log('Connected to server:', this.socket.id);
-        this.socket.emit(ACTIONS.PLAYER_JOIN, { name: playerName });
+        this.socket.emit(ACTIONS.PLAYER_JOIN, { name: playerName, appearance });
       });
 
       this.socket.on(ACTIONS.WORLD_STATE, (state) => {

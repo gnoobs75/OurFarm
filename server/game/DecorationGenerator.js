@@ -29,10 +29,6 @@ export class DecorationGenerator {
     const farmLeft = cx - 7, farmRight = cx + 7;
     const farmTop = cz - 6, farmBottom = cz + 6;
 
-    // Town zone — skip decorations here (NPC buildings/streets live here)
-    const townLeft = 24, townRight = 50;
-    const townTop = 2, townBottom = 16;
-
     // Portal zone -- skip decorations near south edge portal
     const portalLeft = 29, portalRight = 34;
     const portalTop = 57, portalBottom = 63;
@@ -42,9 +38,6 @@ export class DecorationGenerator {
 
       // Skip farm zone
       if (x >= farmLeft && x <= farmRight && z >= farmTop && z <= farmBottom) continue;
-
-      // Skip town zone entirely
-      if (x >= townLeft && x <= townRight && z >= townTop && z <= townBottom) continue;
 
       // Skip portal zone
       if (x >= portalLeft && x <= portalRight && z >= portalTop && z <= portalBottom) continue;

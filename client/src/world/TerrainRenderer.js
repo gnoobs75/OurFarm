@@ -79,9 +79,8 @@ export class TerrainRenderer {
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
 
-    const material = new THREE.MeshLambertMaterial({
+    const material = new THREE.MeshPhongMaterial({
       vertexColors: true,
-      flatShading: true,
     });
 
     this.mesh = new THREE.Mesh(geometry, material);

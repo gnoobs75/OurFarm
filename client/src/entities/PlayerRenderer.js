@@ -3,8 +3,8 @@ import { tileToWorld } from '@shared/TileMap.js';
 
 // Animation durations (seconds)
 const ACTION_DURATION = 0.5;
-const MOVE_LERP = 5;
-const WALK_SPEED = 8; // limb swing frequency
+const PLAYER_WALK_SPEED = 3.0; // tiles per second
+const LIMB_SWING_SPEED = 8; // limb swing frequency
 const ARRIVE_THRESHOLD = 0.05; // distance to consider "arrived"
 
 export class PlayerRenderer {
@@ -15,7 +15,11 @@ export class PlayerRenderer {
   }
 
   addPlayer(playerState, isLocal = false) {
-    const mesh = this.assetGen.createPlayer(isLocal ? 0x4488ff : 0x44cc44);
+    const appearance = playerState.appearance || {};
+    if (!appearance.shirtColor) {
+      appearance.shirtColor = isLocal ? 0x4488ff : 0x44cc44;
+    }
+    const mesh = this.assetGen.createPlayer(appearance);
     mesh.position.set(playerState.x, 0, playerState.z);
     this.scene.add(mesh);
 
@@ -60,8 +64,14 @@ export class PlayerRenderer {
       const { mesh, target } = entry;
       const parts = mesh.userData.parts;
       if (!parts) { // fallback for meshes without parts (shouldn't happen)
-        mesh.position.x += (target.x - mesh.position.x) * MOVE_LERP * delta;
-        mesh.position.z += (target.z - mesh.position.z) * MOVE_LERP * delta;
+        const fdx = target.x - mesh.position.x;
+        const fdz = target.z - mesh.position.z;
+        const fdist = Math.sqrt(fdx * fdx + fdz * fdz);
+        if (fdist > ARRIVE_THRESHOLD) {
+          const fstep = Math.min(PLAYER_WALK_SPEED * delta, fdist);
+          mesh.position.x += (fdx / fdist) * fstep;
+          mesh.position.z += (fdz / fdist) * fstep;
+        }
         continue;
       }
 
@@ -96,10 +106,11 @@ export class PlayerRenderer {
         }
       }
 
-      // --- Position interpolation (always, unless mid-action) ---
-      if (entry.state !== 'action') {
-        mesh.position.x += dx * MOVE_LERP * delta;
-        mesh.position.z += dz * MOVE_LERP * delta;
+      // --- Position interpolation (constant speed, unless mid-action) ---
+      if (entry.state !== 'action' && dist > ARRIVE_THRESHOLD) {
+        const step = Math.min(PLAYER_WALK_SPEED * delta, dist);
+        mesh.position.x += (dx / dist) * step;
+        mesh.position.z += (dz / dist) * step;
       }
 
       // --- Animate based on state ---
@@ -120,7 +131,7 @@ export class PlayerRenderer {
   // ─── Walk Animation ───
 
   _animateWalk(entry, parts, delta) {
-    entry.walkPhase += delta * WALK_SPEED;
+    entry.walkPhase += delta * LIMB_SWING_SPEED;
     const s = Math.sin(entry.walkPhase);
     const c = Math.cos(entry.walkPhase);
 
@@ -256,6 +267,11 @@ export class PlayerRenderer {
   getLocalPlayerPosition(playerId) {
     const entry = this.playerMeshes.get(playerId);
     return entry ? entry.mesh.position : null;
+  }
+
+  getLocalPlayerMesh(playerId) {
+    const entry = this.playerMeshes.get(playerId);
+    return entry ? entry.mesh : null;
   }
 
   dispose() {
