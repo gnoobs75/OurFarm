@@ -571,20 +571,94 @@ export class GameWorld {
     const player = this.players.get(socketId);
     if (!player || !player.useEnergy(5)) return;
 
+    // Prevent casting while already fishing
+    if (player._fishingState) return;
+
     const map = this._getPlayerMap(player);
-    const idx = tileIndex(Math.floor(data.x), Math.floor(data.z));
+    const tileX = Math.floor(data.x);
+    const tileZ = Math.floor(data.z);
+    const idx = tileIndex(tileX, tileZ);
     if (idx < 0 || idx >= map.tiles.length) return;
     if (map.tiles[idx].type !== TILE_TYPES.WATER) return;
 
-    const location = 'pond';
-    const fish = this.fishCalc.rollCatch(location, player.level);
+    // Determine water location type
+    const location = this._getWaterLocation(player.currentMap, tileX, tileZ);
 
-    if (fish) {
-      player.addItem(fish.id, 1);
-      player.addSkillXP(SKILLS.FISHING, 5 + fish.rarity * 10);
+    // Get fishing parameters
+    const fishingLevel = player.getSkillLevel(SKILLS.FISHING);
+    const rodTier = player.toolTiers?.fishing_rod || 0;
+    const baitInfo = null; // Future: read from equipped bait slot
+    const season = this.time.season;
+    const hour = this.time.hour;
+    const isRaining = this.weather.isRaining();
+
+    // Roll which fish bites
+    const fish = this.fishCalc.rollCatch(
+      location, player.level, fishingLevel, rodTier, baitInfo, season, hour, isRaining
+    );
+
+    if (!fish) {
+      // No fish available — immediate miss
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+        type: 'fishMiss', playerId: player.id,
+      });
+      return;
+    }
+
+    // Roll bite timing
+    const { waitTime, nibbles } = this.fishCalc.rollBiteParams(fish.rarity);
+
+    // Store fishing state on player (server tracks what fish was rolled)
+    player._fishingState = {
+      fishId: fish.id,
+      fish,
+      location,
+      castTime: Date.now(),
+    };
+
+    // Send bite data to client — client plays wait/nibble/bite sequence, then mini-game
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'fishingBite',
+      playerId: player.id,
+      fishId: fish.id,
+      fishName: fish.name,
+      rarity: fish.rarity,
+      behavior: fish.behavior,
+      waitTime,
+      nibbles,
+      // Net size modifiers for the catch bar
+      rodTier,
+      fishingLevel,
+      baitNetBonus: 0, // Future: from bait
+    });
+
+    // Broadcast cast animation to other players
+    this._broadcastToMap(player.currentMap, ACTIONS.WORLD_UPDATE, {
+      type: 'playerCast', playerId: player.id, x: data.x, z: data.z,
+    }, socketId);
+  }
+
+  handleFishReel(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player) return;
+
+    const state = player._fishingState;
+    if (!state) return;
+
+    // Clear fishing state
+    player._fishingState = null;
+
+    if (data.success) {
+      // Award the fish
+      player.addItem(state.fishId, 1);
+
+      // XP scales with rarity
+      const xp = 5 + state.fish.rarity * 10;
+      player.addSkillXP(SKILLS.FISHING, xp);
       this._checkPendingProfession(socketId, player);
+
       this._broadcastToMap(player.currentMap, ACTIONS.WORLD_UPDATE, {
-        type: 'fishCaught', playerId: player.id, fish,
+        type: 'fishCaught', playerId: player.id, fish: state.fish,
       });
       this._sendInventoryUpdate(socketId, player);
     } else {
@@ -592,6 +666,13 @@ export class GameWorld {
         type: 'fishMiss', playerId: player.id,
       });
     }
+  }
+
+  /** Determine water location type based on map */
+  _getWaterLocation(mapId, tileX, tileZ) {
+    if (mapId === MAP_IDS.FARM) return 'pond';
+    if (mapId === MAP_IDS.TOWN) return 'river';
+    return 'pond'; // default
   }
 
   handleNPCTalk(socketId, data) {
