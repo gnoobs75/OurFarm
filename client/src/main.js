@@ -34,6 +34,7 @@ import { TILE_TYPES } from '@shared/constants.js';
 import { debugClient } from './utils/DebugClient.js';
 import { FishingEffects } from './effects/FishingEffects.js';
 import { FishingUI } from './ui/FishingUI.js';
+import { GroomingUI } from './ui/GroomingUI.js';
 
 async function main() {
   // --- Engine Setup ---
@@ -61,6 +62,9 @@ async function main() {
   const fishingEffects = new FishingEffects(sceneManager.scene);
   const fishingUI = new FishingUI();
   let fishingState = null; // null = not fishing
+
+  // --- Grooming ---
+  const groomingUI = new GroomingUI();
 
   // --- UI ---
   const hud = new HUD(document.getElementById('hud'));
@@ -255,6 +259,18 @@ async function main() {
     input.on('tileHover', (hoverData) => {
       selectionManager.updateHover(hoverData);
     });
+
+    // --- Pet grooming callback ---
+    selectionManager.onGroom = async (petId) => {
+      const petEntry = pets.petMeshes.get(petId);
+      if (!petEntry) return;
+      const petData = petEntry.data;
+
+      const result = await groomingUI.start(petData);
+      if (!result) return; // cancelled
+
+      network.sendPetGroom(petId, result.stars, result.equipped);
+    };
 
     // --- Right-click: Move player ---
     input.on('tileMove', ({ tile, worldPos }) => {
@@ -458,6 +474,18 @@ async function main() {
           break;
         case 'petUpdate':
           console.log(data.message);
+          break;
+        case 'petGroomResult':
+          if (data.success) {
+            const entry = pets.petMeshes.get(data.pet.id);
+            if (entry) entry.data = data.pet;
+            if (data.newCosmetic) {
+              showToast(`New cosmetic: ${data.newCosmetic.name}!`, 'success');
+            }
+            showToast(`${data.pet.name} loved the grooming! (+${data.happinessGain} happiness)`, 'success');
+          } else {
+            showToast(data.message || 'Already groomed today', 'fail');
+          }
           break;
         case 'forageCollected':
           forage.removeForageItem(data.spawnId);
