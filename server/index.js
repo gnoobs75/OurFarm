@@ -143,6 +143,7 @@ io.on('connection', (socket) => {
 
   // Fishing
   wrap(ACTIONS.FISH_CAST, (data) => world.handleFishCast(socket.id, data));
+  wrap(ACTIONS.FISH_REEL, (data) => world.handleFishReel(socket.id, data));
 
   // NPC interaction
   wrap(ACTIONS.NPC_TALK, (data) => world.handleNPCTalk(socket.id, data));

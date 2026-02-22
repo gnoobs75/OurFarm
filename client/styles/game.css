@@ -717,6 +717,185 @@ body {
   color: #f5d142;
 }
 
+/* ═══════════════════════════════════════════
+   FISHING MINI-GAME PANEL
+   ═══════════════════════════════════════════ */
+
+.fishing-panel {
+  position: fixed;
+  right: -160px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 140px;
+  background: rgba(30, 22, 14, 0.95);
+  border: 2px solid #8b6914;
+  border-radius: 12px;
+  padding: 12px;
+  z-index: 150;
+  pointer-events: auto;
+  transition: right 0.3s ease-out;
+  box-shadow:
+    0 0 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.fishing-panel-visible {
+  right: 20px;
+}
+
+.fishing-panel-exit {
+  right: -160px;
+  transition: right 0.3s ease-in;
+}
+
+.fishing-header {
+  text-align: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(139, 105, 20, 0.3);
+}
+
+.fishing-fish-name {
+  font-size: 14px;
+  font-weight: 700;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.fishing-rarity {
+  font-size: 10px;
+  color: #c4956a;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.fishing-track-wrapper {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+.fishing-track {
+  position: relative;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(139, 105, 20, 0.4);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.fishing-net {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(60, 180, 80, 0.25);
+  border: 1px solid rgba(60, 180, 80, 0.5);
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+
+.fishing-net-active {
+  background: rgba(60, 180, 80, 0.45);
+  border-color: rgba(100, 255, 120, 0.7);
+}
+
+.fishing-fish-icon {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 12px;
+  background: #f5d142;
+  border-radius: 50% 50% 40% 40%;
+  box-shadow: 0 0 6px rgba(245, 209, 66, 0.6);
+}
+
+.fishing-fish-icon::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 2px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid #f5d142;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+
+.fishing-progress-wrapper {
+  height: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 8px;
+  border: 1px solid rgba(139, 105, 20, 0.3);
+}
+
+.fishing-progress-bar {
+  height: 100%;
+  width: 30%;
+  background: #4c4;
+  border-radius: 3px;
+  transition: width 0.05s linear;
+}
+
+.fishing-hint {
+  text-align: center;
+  font-size: 9px;
+  color: rgba(196, 149, 106, 0.6);
+  margin-top: 6px;
+  letter-spacing: 0.5px;
+}
+
+/* ═══════════════════════════════════════════
+   TOAST NOTIFICATIONS
+   ═══════════════════════════════════════════ */
+
+.toast-container {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  background: rgba(30, 22, 14, 0.95);
+  border: 1px solid #8b6914;
+  border-radius: 8px;
+  padding: 10px 20px;
+  color: #f5e6d0;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-10px);
+  animation: toast-in 0.3s ease-out forwards, toast-out 0.3s ease-in 2.5s forwards;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.toast-success {
+  border-color: #4c4;
+  color: #8f8;
+}
+
+.toast-fail {
+  border-color: #c44;
+  color: #faa;
+}
+
+@keyframes toast-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toast-out {
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
 @media (max-width: 600px) {
   .splash-body {
     flex-direction: column;
