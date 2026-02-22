@@ -37,6 +37,7 @@ const npcsData = JSON.parse(readFileSync(join(dataDir, 'npcs.json'), 'utf-8'));
 const fishData = JSON.parse(readFileSync(join(dataDir, 'fish.json'), 'utf-8'));
 const recipesData = JSON.parse(readFileSync(join(dataDir, 'recipes.json'), 'utf-8'));
 const machinesData = JSON.parse(readFileSync(join(dataDir, 'machines.json'), 'utf-8'));
+const cosmeticsData = JSON.parse(readFileSync(join(dataDir, 'cosmetics.json'), 'utf-8'));
 
 export class GameWorld {
   constructor(io) {
@@ -881,6 +882,62 @@ export class GameWorld {
     this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
       type: 'petUpdate', pet: pet.getState(), message,
     });
+  }
+
+  handlePetGroom(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const pet = farmMap.pets.get(data.petId);
+    if (!pet || pet.ownerId !== player.id) return;
+
+    const stars = Math.max(1, Math.min(3, data.stars || 1));
+    const result = pet.groom(stars, this.time.day);
+
+    if (!result.success) {
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+        type: 'petGroomResult', success: false, message: result.message,
+      });
+      return;
+    }
+
+    // Roll cosmetic drop
+    let newCosmetic = null;
+    const roll = Math.random();
+    const dropChances = { 0: 0.30, 1: 0.10, 2: 0.02 };
+
+    for (const rarity of [2, 1, 0]) {
+      if (roll < dropChances[rarity]) {
+        const available = Object.entries(cosmeticsData).filter(
+          ([id, c]) => c.rarity === rarity && !pet.cosmetics.unlocked.includes(id)
+        );
+        if (available.length > 0) {
+          const pick = available[Math.floor(Math.random() * available.length)];
+          newCosmetic = pick[0];
+          pet.cosmetics.unlocked.push(newCosmetic);
+        }
+        break;
+      }
+    }
+
+    if (data.equipped) {
+      pet.equipCosmetics(data.equipped);
+    }
+
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'petGroomResult',
+      success: true,
+      pet: pet.getState(),
+      stars,
+      happinessGain: result.happinessGain,
+      loyaltyGain: result.loyaltyGain,
+      newCosmetic: newCosmetic ? { id: newCosmetic, ...cosmeticsData[newCosmetic] } : null,
+    });
+
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'petUpdate', pet: pet.getState(),
+    }, socketId);
   }
 
   handleCraftStart(socketId, data) {
