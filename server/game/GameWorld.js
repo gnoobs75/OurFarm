@@ -167,9 +167,13 @@ export class GameWorld {
       farmMap.animals.set(animal.id, animal);
     }
 
-    // Spawn starter pet
-    const starterPet = new Pet({ ownerId: null, type: 'dog', name: 'Buddy', x: 30, z: 31 });
-    farmMap.pets.set(starterPet.id, starterPet);
+    // Spawn starter pets
+    const stitch = new Pet({ ownerId: null, type: 'chihuahua', name: 'Stitch',
+      bodySize: 0.15, earSize: 0.12, tailLength: 0.12, color: 0x444444, x: 30, z: 31 });
+    const scout = new Pet({ ownerId: null, type: 'labrador', name: 'Scout',
+      bodySize: 0.35, earSize: 0.10, tailLength: 0.22, color: 0x1a1a1a, x: 31, z: 32 });
+    farmMap.pets.set(stitch.id, stitch);
+    farmMap.pets.set(scout.id, scout);
 
     logger.info('WORLD', 'Starter farm initialized', {
       farmBuildings: farmMap.buildings.size,
@@ -385,7 +389,6 @@ export class GameWorld {
     for (const pet of farmMap.pets.values()) {
       if (!pet.ownerId) {
         pet.ownerId = player.id;
-        break;
       }
     }
 

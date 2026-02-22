@@ -17,7 +17,7 @@ export class Pet {
     this.color = data.color ?? Math.floor(Math.random() * 0xffffff);
     this.x = data.x ?? 32;
     this.z = data.z ?? 33;
-    this.cosmetics = data.cosmetics || { unlocked: [], equipped: { hat: null, neck: null, back: null } };
+    this.cosmetics = data.cosmetics || { unlocked: ['straw_hat', 'red_bandana', 'cape'], equipped: { hat: null, neck: null, back: null } };
     this.lastGroomed = data.lastGroomed || -1;
   }
 
