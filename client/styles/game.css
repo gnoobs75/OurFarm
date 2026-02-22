@@ -1130,6 +1130,85 @@ body {
     inset 0 0 60px rgba(120, 80, 40, 0.1);
 }
 
+.groom-scene-3d { display: flex; flex-direction: column; }
+.groom-3d-viewport { position: relative; flex: 1; min-height: 300px; overflow: hidden; }
+.groom-3d-canvas { display: block; width: 100%; height: 100%; border-radius: 8px; }
+.groom-tool-cursor-3d {
+  position: absolute;
+  pointer-events: none;
+  font-size: 28px;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  filter: drop-shadow(0 0 4px rgba(255,255,255,0.6));
+  transition: opacity 0.2s;
+  opacity: 0;
+}
+.groom-tool-cursor-3d.tool-active { opacity: 1; }
+.groom-orbit-hint {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 11px;
+  color: rgba(255,220,180,0.4);
+  pointer-events: none;
+}
+
+.groom-dressup-slots {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.groom-dressup-slot-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 2px solid rgba(210,160,100,0.4);
+  background: rgba(80,50,20,0.4);
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+.groom-dressup-slot-btn .slot-icon { font-size: 24px; }
+.groom-dressup-tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 8px;
+}
+.groom-dressup-item-btn {
+  font-size: 28px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 2px solid rgba(210,160,100,0.3);
+  background: rgba(80,50,20,0.3);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.groom-dressup-item-btn:hover { background: rgba(100,70,30,0.5); }
+.groom-dressup-item-btn.equipped {
+  border-color: #ffd700;
+  background: rgba(120,90,30,0.5);
+}
+.groom-dressup-done-btn {
+  display: block;
+  margin: 10px auto 0;
+  padding: 8px 32px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 2px solid rgba(210,160,100,0.5);
+  background: linear-gradient(135deg, #6b4a2a 0%, #8b6040 100%);
+  color: #fff;
+  cursor: pointer;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+.groom-dressup-done-btn:hover { background: linear-gradient(135deg, #7b5a3a 0%, #9b7050 100%); }
+
 .groom-salon-bg {
   position: absolute;
   inset: 0;

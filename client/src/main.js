@@ -34,7 +34,7 @@ import { TILE_TYPES } from '@shared/constants.js';
 import { debugClient } from './utils/DebugClient.js';
 import { FishingEffects } from './effects/FishingEffects.js';
 import { FishingUI } from './ui/FishingUI.js';
-import { GroomingUI } from './ui/GroomingUI.js';
+import { GroomingUI3D as GroomingUI } from './ui/GroomingUI3D.js';
 
 async function main() {
   // --- Engine Setup ---

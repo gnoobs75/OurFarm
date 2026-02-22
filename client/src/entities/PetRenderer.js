@@ -27,6 +27,11 @@ export class PetRenderer {
     // Pets idle — slight bobbing
     for (const { mesh } of this.petMeshes.values()) {
       mesh.position.y = Math.sin(Date.now() * 0.003 + mesh.position.x) * 0.02;
+      const parts = mesh.userData.parts;
+      if (parts?.tail) {
+        const tailSeg = Array.isArray(parts.tail) ? parts.tail[0] : parts.tail;
+        if (tailSeg) tailSeg.rotation.y = Math.sin(Date.now() * 0.005) * 0.3;
+      }
     }
   }
 
