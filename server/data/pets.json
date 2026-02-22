@@ -4,5 +4,7 @@
   "rabbit": { "name": "Rabbit", "buyPrice": 250, "bonus": "foragingLuck", "bonusValue": 0.1, "rarity": "common" },
   "parrot": { "name": "Parrot", "buyPrice": 500, "bonus": "npcRelation", "bonusValue": 0.15, "rarity": "uncommon" },
   "fox": { "name": "Fox", "buyPrice": 1000, "bonus": "animalProduct", "bonusValue": 0.2, "rarity": "rare" },
-  "owl": { "name": "Owl", "buyPrice": 1200, "bonus": "nightBonus", "bonusValue": 0.25, "rarity": "rare" }
+  "owl": { "name": "Owl", "buyPrice": 1200, "bonus": "nightBonus", "bonusValue": 0.25, "rarity": "rare" },
+  "chihuahua": { "name": "Chihuahua", "buyPrice": 350, "bonus": "harvestSpeed", "bonusValue": 0.15, "rarity": "common" },
+  "labrador": { "name": "Labrador", "buyPrice": 400, "bonus": "harvestSpeed", "bonusValue": 0.18, "rarity": "common" }
 }

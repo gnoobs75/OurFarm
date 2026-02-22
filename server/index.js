@@ -155,6 +155,7 @@ io.on('connection', (socket) => {
 
   // Pet interaction
   wrap(ACTIONS.PET_INTERACT, (data) => world.handlePetInteract(socket.id, data));
+  wrap(ACTIONS.PET_GROOM, (data) => world.handlePetGroom(socket.id, data));
 
   // Crafting
   wrap(ACTIONS.CRAFT_START, (data) => world.handleCraftStart(socket.id, data));

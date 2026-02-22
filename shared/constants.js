@@ -84,6 +84,7 @@ export const ACTIONS = {
   NPC_TALK: 'npc:talk',
   NPC_GIFT: 'npc:gift',
   PET_INTERACT: 'pet:interact',
+  PET_GROOM: 'pet:groom',
   CRAFT_START: 'craft:start',
   CRAFT_COLLECT: 'craft:collect',
   SHOP_BUY: 'shop:buy',

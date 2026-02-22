@@ -5,7 +5,7 @@ import * as THREE from 'three';
 
 const ENTITY_ACTIONS = {
   animal:  ['Feed', 'Collect', 'Pet'],
-  pet:     ['Pet', 'Play'],
+  pet:     ['Pet', 'Groom'],
   npc:     ['Talk', 'Gift'],
   machine: ['Insert Item', 'Collect Output'],
   crop:    ['Harvest'],
@@ -27,6 +27,8 @@ export class SelectionManager {
     this._contextMenu = document.getElementById('context-menu');
     this._contextMenuVisible = false;
     this._hoverTime = 0;
+
+    this.onGroom = null;
 
     // Close context menu on click outside
     this._onDocClick = (e) => {
@@ -194,7 +196,9 @@ export class SelectionManager {
         break;
       case 'pet':
         if (action === 'Pet') net.sendPetInteract(entityId, 'pet');
-        if (action === 'Play') net.sendPetInteract(entityId, 'play');
+        if (action === 'Groom') {
+          if (this.onGroom) this.onGroom(entityId);
+        }
         break;
       case 'machine':
         if (action === 'Collect Output') net.sendMachineCollect(entityId);

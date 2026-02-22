@@ -73,6 +73,7 @@ export class NetworkClient {
   sendNPCTalk(npcId) { this.socket.emit(ACTIONS.NPC_TALK, { npcId }); }
   sendNPCGift(npcId, itemId) { this.socket.emit(ACTIONS.NPC_GIFT, { npcId, itemId }); }
   sendPetInteract(petId, action) { this.socket.emit(ACTIONS.PET_INTERACT, { petId, action }); }
+  sendPetGroom(petId, stars, equipped) { this.socket.emit(ACTIONS.PET_GROOM, { petId, stars, equipped }); }
   sendCraftStart(buildingId, recipeId) { this.socket.emit(ACTIONS.CRAFT_START, { buildingId, recipeId }); }
   sendCraftCollect(buildingId) { this.socket.emit(ACTIONS.CRAFT_COLLECT, { buildingId }); }
   sendBuy(itemId, quantity) { this.socket.emit(ACTIONS.SHOP_BUY, { itemId, quantity }); }

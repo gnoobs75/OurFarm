@@ -64,8 +64,8 @@ export class InputManager {
   _onPointerMove(e) {
     const pos = this._getPointerPos(e);
 
-    // Detect drag (camera pan)
-    if (e.buttons > 0) {
+    // Detect drag (camera pan) — only left-button drag pans; right-click is for movement
+    if (e.buttons & 1) {
       const dx = pos.x - this.dragStart.x;
       const dy = pos.y - this.dragStart.y;
       if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {

@@ -32,6 +32,9 @@ import { getToolAction, isSeed } from './ui/ItemIcons.js';
 import { tileToWorld } from '@shared/TileMap.js';
 import { TILE_TYPES } from '@shared/constants.js';
 import { debugClient } from './utils/DebugClient.js';
+import { FishingEffects } from './effects/FishingEffects.js';
+import { FishingUI } from './ui/FishingUI.js';
+import { GroomingUI3D as GroomingUI } from './ui/GroomingUI3D.js';
 
 async function main() {
   // --- Engine Setup ---
@@ -54,6 +57,14 @@ async function main() {
   const sprinklers = new SprinklerRenderer(sceneManager.scene);
   const machines = new MachineRenderer(sceneManager.scene);
   let forage = new ForageRenderer(sceneManager.scene);
+
+  // --- Fishing ---
+  const fishingEffects = new FishingEffects(sceneManager.scene);
+  const fishingUI = new FishingUI();
+  let fishingState = null; // null = not fishing
+
+  // --- Grooming ---
+  const groomingUI = new GroomingUI();
 
   // --- UI ---
   const hud = new HUD(document.getElementById('hud'));
@@ -103,6 +114,87 @@ async function main() {
       players: state.players.length,
       time: state.time,
     });
+
+    // --- Toast notification helper ---
+    function showToast(message, type = '') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      toast.className = 'toast' + (type ? ` toast-${type}` : '');
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 3000);
+    }
+
+    // --- Fishing state machine ---
+    async function startFishingSequence(biteData) {
+      const playerPos = players.getLocalPlayerPosition(network.playerId);
+      if (!playerPos) return;
+
+      fishingState = 'waiting';
+
+      // Schedule nibbles during wait
+      const { waitTime, nibbles } = biteData;
+      const nibbleInterval = waitTime / (nibbles + 1);
+      let nibbleCount = 0;
+
+      // Wait phase with nibbles
+      await new Promise((resolve) => {
+        let elapsed = 0;
+        const interval = setInterval(() => {
+          elapsed += 0.1;
+          if (!fishingState) { clearInterval(interval); resolve(); return; }
+
+          // Nibble timing
+          if (nibbleCount < nibbles && elapsed > nibbleInterval * (nibbleCount + 1)) {
+            fishingEffects.playNibble();
+            nibbleCount++;
+          }
+
+          if (elapsed >= waitTime) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 100);
+      });
+
+      if (!fishingState) return; // cancelled during wait
+
+      // Bite!
+      fishingEffects.playBite();
+      fishingState = 'minigame';
+
+      // Small delay for bite visual, then show mini-game
+      await new Promise(r => setTimeout(r, 400));
+
+      if (!fishingState) return; // cancelled during bite
+
+      // Start mini-game
+      const caught = await fishingUI.start({
+        fishName: biteData.fishName,
+        rarity: biteData.rarity,
+        behavior: biteData.behavior,
+        rodTier: biteData.rodTier,
+        fishingLevel: biteData.fishingLevel,
+        baitNetBonus: biteData.baitNetBonus || 0,
+      });
+
+      fishingState = null;
+
+      // Send result to server
+      network.sendFishReel(caught);
+
+      // Play outcome effects
+      if (caught) {
+        fishingEffects.playCatch();
+        showToast(`Caught a ${biteData.fishName}!`, 'success');
+      } else {
+        fishingEffects.playMiss();
+        showToast('The fish got away...', 'fail');
+      }
+    }
 
     // --- Build world from server state ---
     terrain.build(state.tiles, state.time.season);
@@ -168,9 +260,30 @@ async function main() {
       selectionManager.updateHover(hoverData);
     });
 
+    // --- Pet grooming callback ---
+    selectionManager.onGroom = async (petId) => {
+      const petEntry = pets.petMeshes.get(petId);
+      if (!petEntry) return;
+      const petData = petEntry.data;
+
+      const result = await groomingUI.start(petData);
+      if (!result) return; // cancelled
+
+      network.sendPetGroom(petId, result.stars, result.equipped);
+    };
+
     // --- Right-click: Move player ---
     input.on('tileMove', ({ tile, worldPos }) => {
       if (dialogueUI.visible) return;
+
+      // Cancel fishing on right-click
+      if (fishingState) {
+        fishingState = null;
+        fishingEffects.cancel();
+        fishingUI.dispose();
+        network.sendFishCancel();
+        return;
+      }
 
       // Check for machine interaction
       const machineId = machines.getMachineAtPosition(worldPos.x, worldPos.z);
@@ -234,6 +347,8 @@ async function main() {
       const action = getToolAction(activeItem.itemId);
       if (!action) return;
 
+      if (fishingState) return;
+
       switch (action) {
         case 'hoe':
           network.sendTill(tile.x, tile.z);
@@ -246,9 +361,17 @@ async function main() {
           network.sendPlant(tile.x, tile.z, seedType);
           break;
         }
-        case 'fishing_rod':
+        case 'fishing_rod': {
+          // Don't cast if already fishing
+          if (fishingState) break;
           network.sendFishCast(worldPos.x, worldPos.z);
+          // Start bobber cast effect immediately
+          const playerPos = players.getLocalPlayerPosition(network.playerId);
+          if (playerPos) {
+            fishingEffects.startCast(playerPos, { x: worldPos.x, z: worldPos.z });
+          }
           break;
+        }
         case 'pickaxe':
           network.sendHarvest(tile.x, tile.z);
           break;
@@ -269,6 +392,15 @@ async function main() {
 
     // --- Keyboard shortcuts ---
     input.on('keyDown', ({ key }) => {
+      // Cancel fishing on Escape
+      if (key === 'Escape' && fishingState) {
+        fishingState = null;
+        fishingEffects.cancel();
+        fishingUI.dispose();
+        network.sendFishCancel();
+        return;
+      }
+
       if (key === 'i' || key === 'I') inventoryUI.toggle();
       if (key === 'F3') debugWindow.toggle();
       if (key === 'c' || key === 'C') {
@@ -313,11 +445,21 @@ async function main() {
         case 'cropHarvested':
           crops.removeCrop(data.cropId);
           break;
+        case 'fishingBite':
+          // Server rolled a fish — start the cinematic bite + mini-game sequence
+          if (data.playerId === network.playerId) {
+            startFishingSequence(data);
+          }
+          break;
         case 'fishCaught':
-          console.log('Caught:', data.fish.name);
+          if (data.playerId !== network.playerId) {
+            console.log(`${data.playerId} caught: ${data.fish.name}`);
+          }
           break;
         case 'fishMiss':
-          console.log('The fish got away...');
+          if (data.playerId !== network.playerId) {
+            console.log(`${data.playerId} missed a fish`);
+          }
           break;
         case 'npcDialogue':
           dialogueUI._npcId = data.npcId;
@@ -332,6 +474,18 @@ async function main() {
           break;
         case 'petUpdate':
           console.log(data.message);
+          break;
+        case 'petGroomResult':
+          if (data.success) {
+            const entry = pets.petMeshes.get(data.pet.id);
+            if (entry) entry.data = data.pet;
+            if (data.newCosmetic) {
+              showToast(`New cosmetic: ${data.newCosmetic.name}!`, 'success');
+            }
+            showToast(`${data.pet.name} loved the grooming! (+${data.happinessGain} happiness)`, 'success');
+          } else {
+            showToast(data.message || 'Already groomed today', 'fail');
+          }
           break;
         case 'forageCollected':
           forage.removeForageItem(data.spawnId);
@@ -453,6 +607,7 @@ async function main() {
       creatures.update(delta, sceneManager.cameraTarget);
       weather.update(delta, sceneManager.cameraTarget);
       players.update(delta);
+      fishingEffects.update(delta);
       npcs.update(delta);
       pets.update(delta);
       animals.update(delta);

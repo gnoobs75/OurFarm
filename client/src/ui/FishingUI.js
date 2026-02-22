@@ -2,16 +2,16 @@
 // Stardew-style vertical catch bar mini-game.
 // Runs its own animation loop. Returns a promise that resolves true/false.
 
-const TRACK_HEIGHT = 280;
-const TRACK_WIDTH = 36;
-const FILL_RATE = 0.015;
-const STARTING_PROGRESS = 0.3;
+const TRACK_HEIGHT = 400;
+const TRACK_WIDTH = 48;
+const FILL_RATE = 0.008;
+const STARTING_PROGRESS = 0.25;
 
 const RARITY_CONFIG = {
-  0: { netSize: 0.40, fishSpeed: 60,  drainRate: 0.008,  label: 'Common',    color: '#888' },
-  1: { netSize: 0.30, fishSpeed: 100, drainRate: 0.012,  label: 'Uncommon',  color: '#4a4' },
-  2: { netSize: 0.22, fishSpeed: 160, drainRate: 0.016,  label: 'Rare',      color: '#48f' },
-  3: { netSize: 0.15, fishSpeed: 220, drainRate: 0.024,  label: 'Legendary', color: '#f84' },
+  0: { netSize: 0.30, fishSpeed: 70,  drainRate: 0.010,  label: 'Common',    color: '#88cc88' },
+  1: { netSize: 0.24, fishSpeed: 110, drainRate: 0.014,  label: 'Uncommon',  color: '#44cc44' },
+  2: { netSize: 0.18, fishSpeed: 170, drainRate: 0.020,  label: 'Rare',      color: '#4488ff' },
+  3: { netSize: 0.12, fishSpeed: 240, drainRate: 0.028,  label: 'Legendary', color: '#ff8844' },
 };
 
 const LIFT_ACCEL = 800;
@@ -76,22 +76,63 @@ export class FishingUI {
 
   _buildUI(fishData, config, netHeight) {
     this._container = document.createElement('div');
-    this._container.className = 'fishing-panel';
+    this._container.className = 'fishing-overlay';
+
+    // Generate random bubbles
+    let bubblesHTML = '';
+    for (let i = 0; i < 10; i++) {
+      const left = 5 + Math.random() * 90;
+      const delay = Math.random() * 4;
+      const size = 4 + Math.random() * 10;
+      const dur = 3 + Math.random() * 3;
+      bubblesHTML += `<div class="fishing-bubble" style="left:${left}%;animation-delay:${delay}s;width:${size}px;height:${size}px;animation-duration:${dur}s;"></div>`;
+    }
+
+    // Spectator fish
+    const spectators = [
+      { cls: 'spec-fish-1', emoji: '\u{1F420}', style: 'left:8%;top:55%' },
+      { cls: 'spec-fish-2', emoji: '\u{1F421}', style: 'right:8%;top:40%' },
+      { cls: 'spec-fish-3', emoji: '\u{1F41F}', style: 'left:15%;top:75%' },
+    ];
+    const specHTML = spectators.map(s =>
+      `<div class="fishing-spectator ${s.cls}" style="${s.style}"><span class="spec-emoji">${s.emoji}</span><span class="spec-eyes">O O</span></div>`
+    ).join('');
+
     this._container.innerHTML = `
-      <div class="fishing-header">
-        <div class="fishing-fish-name" style="color: ${config.color}">${fishData.fishName}</div>
-        <div class="fishing-rarity">${config.label}</div>
-      </div>
-      <div class="fishing-track-wrapper">
-        <div class="fishing-track" style="width: ${TRACK_WIDTH}px; height: ${TRACK_HEIGHT}px;">
-          <div class="fishing-net" style="height: ${netHeight}px;"></div>
-          <div class="fishing-fish-icon"></div>
+      <div class="fishing-backdrop"></div>
+      <div class="fishing-scene">
+        <div class="fishing-surface">
+          <div class="fishing-lilypad lp-1"></div>
+          <div class="fishing-lilypad lp-2"></div>
+          <div class="fishing-lilypad lp-3"></div>
         </div>
+        <div class="fishing-underwater">
+          ${bubblesHTML}
+          <div class="fishing-seaweed sw-1"></div>
+          <div class="fishing-seaweed sw-2"></div>
+          <div class="fishing-seaweed sw-3"></div>
+          ${specHTML}
+          <div class="fishing-hooked-fish">
+            <div class="hooked-body">\u{1F41F}</div>
+            <div class="hooked-eyes"></div>
+          </div>
+          <div class="fishing-bar-area">
+            <div class="fishing-header">
+              <div class="fishing-fish-name" style="color: ${config.color}">${fishData.fishName}</div>
+              <div class="fishing-rarity">${config.label}</div>
+            </div>
+            <div class="fishing-track" style="width:${TRACK_WIDTH}px;height:${TRACK_HEIGHT}px;">
+              <div class="fishing-net" style="height:${netHeight}px;"></div>
+              <div class="fishing-fish-icon"></div>
+            </div>
+            <div class="fishing-progress-wrapper">
+              <div class="fishing-progress-bar"></div>
+            </div>
+            <div class="fishing-hint">Hold SPACE or CLICK to reel</div>
+          </div>
+        </div>
+        <div class="fishing-result-text"></div>
       </div>
-      <div class="fishing-progress-wrapper">
-        <div class="fishing-progress-bar"></div>
-      </div>
-      <div class="fishing-hint">Hold SPACE or CLICK to reel</div>
     `;
 
     document.getElementById('ui-overlay').appendChild(this._container);
@@ -99,9 +140,12 @@ export class FishingUI {
     this._netEl = this._container.querySelector('.fishing-net');
     this._fishEl = this._container.querySelector('.fishing-fish-icon');
     this._progressEl = this._container.querySelector('.fishing-progress-bar');
+    this._hookedFish = this._container.querySelector('.fishing-hooked-fish');
+    this._spectators = this._container.querySelectorAll('.fishing-spectator');
+    this._resultText = this._container.querySelector('.fishing-result-text');
 
     requestAnimationFrame(() => {
-      this._container.classList.add('fishing-panel-visible');
+      this._container.classList.add('fishing-overlay-visible');
     });
   }
 
@@ -330,6 +374,25 @@ export class FishingUI {
     const fishCenter = this._fishPos + 6;
     const inNet = fishCenter >= this._netPos && fishCenter <= this._netPos + this._netHeight;
     this._netEl.classList.toggle('fishing-net-active', inNet);
+
+    // Sync hooked fish position with fish icon
+    if (this._hookedFish) {
+      const pct = (this._fishPos / TRACK_HEIGHT) * 100;
+      this._hookedFish.style.bottom = pct + '%';
+      const dir = this._fishPos - (this._prevFishPos || this._fishPos);
+      this._hookedFish.style.transform = dir < 0 ? 'scaleX(-1)' : 'scaleX(1)';
+      this._prevFishPos = this._fishPos;
+    }
+
+    // Spectator reactions based on progress
+    if (this._spectators) {
+      const reaction = this._progress < 0.2 ? 'spec-gasp' :
+                       this._progress > 0.7 ? 'spec-cheer' : '';
+      this._spectators.forEach(s => {
+        s.classList.toggle('spec-gasp', reaction === 'spec-gasp');
+        s.classList.toggle('spec-cheer', reaction === 'spec-cheer');
+      });
+    }
   }
 
   _endGame(success) {
@@ -341,20 +404,37 @@ export class FishingUI {
     window.removeEventListener('keydown', this._onKeyDown);
     window.removeEventListener('keyup', this._onKeyUp);
 
-    if (this._container) {
-      this._container.classList.remove('fishing-panel-visible');
-      this._container.classList.add('fishing-panel-exit');
-      setTimeout(() => {
-        if (this._container && this._container.parentNode) {
-          this._container.parentNode.removeChild(this._container);
-        }
-        this._container = null;
-      }, 300);
-    }
-
     if (this._resolve) {
       this._resolve(success);
       this._resolve = null;
+    }
+
+    if (this._container) {
+      // Show result text
+      if (this._resultText) {
+        this._resultText.textContent = success ? 'CAUGHT!' : 'Got away...';
+        this._resultText.className = 'fishing-result-text ' + (success ? 'result-win' : 'result-lose');
+      }
+      if (success && this._hookedFish) {
+        this._hookedFish.classList.add('hooked-caught');
+      }
+      if (!success && this._hookedFish) {
+        this._hookedFish.classList.add('hooked-escaped');
+      }
+
+      // Delay removal for result animation
+      setTimeout(() => {
+        if (this._container) {
+          this._container.classList.remove('fishing-overlay-visible');
+          this._container.classList.add('fishing-overlay-exit');
+        }
+        setTimeout(() => {
+          if (this._container && this._container.parentNode) {
+            this._container.parentNode.removeChild(this._container);
+          }
+          this._container = null;
+        }, 400);
+      }, success ? 800 : 600);
     }
   }
 

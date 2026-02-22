@@ -18,7 +18,8 @@ export class PetRenderer {
       color: pet.color,
     });
     mesh.position.set(pet.x, 0, pet.z);
-    mesh.userData = { petId: pet.id, name: pet.name };
+    mesh.userData.petId = pet.id;
+    mesh.userData.name = pet.name;
     this.scene.add(mesh);
     this.petMeshes.set(pet.id, { mesh, data: pet });
   }
@@ -27,6 +28,11 @@ export class PetRenderer {
     // Pets idle — slight bobbing
     for (const { mesh } of this.petMeshes.values()) {
       mesh.position.y = Math.sin(Date.now() * 0.003 + mesh.position.x) * 0.02;
+      const parts = mesh.userData.parts;
+      if (parts?.tail) {
+        const tailSeg = Array.isArray(parts.tail) ? parts.tail[0] : parts.tail;
+        if (tailSeg) tailSeg.rotation.y = Math.sin(Date.now() * 0.005) * 0.3;
+      }
     }
   }
 
