@@ -18,7 +18,8 @@ export class PetRenderer {
       color: pet.color,
     });
     mesh.position.set(pet.x, 0, pet.z);
-    mesh.userData = { petId: pet.id, name: pet.name };
+    mesh.userData.petId = pet.id;
+    mesh.userData.name = pet.name;
     this.scene.add(mesh);
     this.petMeshes.set(pet.id, { mesh, data: pet });
   }
