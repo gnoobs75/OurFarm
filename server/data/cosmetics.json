@@ -1,0 +1,17 @@
+{
+  "straw_hat":       { "name": "Straw Hat",       "slot": "hat",  "rarity": 0, "price": 0 },
+  "party_hat":       { "name": "Party Hat",       "slot": "hat",  "rarity": 0, "price": 0 },
+  "flower_wreath":   { "name": "Flower Wreath",   "slot": "hat",  "rarity": 1, "price": 200 },
+  "cowboy_hat":      { "name": "Cowboy Hat",      "slot": "hat",  "rarity": 1, "price": 300 },
+  "crown":           { "name": "Crown",           "slot": "hat",  "rarity": 2, "price": 800 },
+  "red_bandana":     { "name": "Red Bandana",     "slot": "neck", "rarity": 0, "price": 0 },
+  "bow_tie":         { "name": "Bow Tie",         "slot": "neck", "rarity": 0, "price": 0 },
+  "bell_collar":     { "name": "Bell Collar",     "slot": "neck", "rarity": 1, "price": 200 },
+  "flower_lei":      { "name": "Flower Lei",      "slot": "neck", "rarity": 1, "price": 250 },
+  "scarf":           { "name": "Scarf",           "slot": "neck", "rarity": 2, "price": 700 },
+  "cape":            { "name": "Cape",            "slot": "back", "rarity": 0, "price": 0 },
+  "backpack":        { "name": "Backpack",        "slot": "back", "rarity": 0, "price": 0 },
+  "angel_wings":     { "name": "Angel Wings",     "slot": "back", "rarity": 1, "price": 350 },
+  "butterfly_wings": { "name": "Butterfly Wings", "slot": "back", "rarity": 1, "price": 400 },
+  "saddle":          { "name": "Saddle",          "slot": "back", "rarity": 2, "price": 900 }
+}
