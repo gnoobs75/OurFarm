@@ -569,17 +569,18 @@ export class GameWorld {
 
   handleFishCast(socketId, data) {
     const player = this.players.get(socketId);
-    if (!player || !player.useEnergy(5)) return;
+    if (!player) { logger.warn('FISH', 'No player found', { socketId }); return; }
+    if (!player.useEnergy(5)) { logger.warn('FISH', 'Not enough energy', { energy: player.energy }); return; }
 
     // Prevent casting while already fishing
-    if (player._fishingState) return;
+    if (player._fishingState) { logger.warn('FISH', 'Already fishing'); return; }
 
     const map = this._getPlayerMap(player);
     const tileX = Math.floor(data.x);
     const tileZ = Math.floor(data.z);
     const idx = tileIndex(tileX, tileZ);
-    if (idx < 0 || idx >= map.tiles.length) return;
-    if (map.tiles[idx].type !== TILE_TYPES.WATER) return;
+    if (idx < 0 || idx >= map.tiles.length) { logger.warn('FISH', 'Tile out of bounds', { tileX, tileZ, idx }); return; }
+    if (map.tiles[idx].type !== TILE_TYPES.WATER) { logger.warn('FISH', 'Not water tile', { tileX, tileZ, type: map.tiles[idx].type }); return; }
 
     // Determine water location type
     const location = this._getWaterLocation(player.currentMap, tileX, tileZ);
@@ -597,8 +598,11 @@ export class GameWorld {
       location, player.level, fishingLevel, rodTier, baitInfo, season, hour, isRaining
     );
 
+    logger.info('FISH', 'Cast processed', { location, fishingLevel, season, hour, isRaining, fishFound: !!fish, fishName: fish?.name });
+
     if (!fish) {
       // No fish available — immediate miss
+      logger.warn('FISH', 'No fish available for conditions');
       this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
         type: 'fishMiss', playerId: player.id,
       });
