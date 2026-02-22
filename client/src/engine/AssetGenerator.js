@@ -555,6 +555,10 @@ export class AssetGenerator {
   // ═══════════════════════════════════════════════
 
   createPet(type, params = {}) {
+    if (type === 'chihuahua') return this._createChihuahua(params);
+    if (type === 'labrador') return this._createLabrador(params);
+
+    // Generic fallback for unknown pet types
     const group = new THREE.Group();
     const { bodySize = 0.25, earSize = 0.1, tailLength = 0.2, color = 0xbb8844 } = params;
     const bodyMat = this.getMaterial(color);
@@ -590,6 +594,191 @@ export class AssetGenerator {
       group.add(leg);
     }
 
+    group.userData.parts = { body, head, tail: [tail] };
+    group.castShadow = true;
+    return group;
+  }
+
+  // ── Chihuahua ──────────────────────────────────
+  // Tiny apple-dome dog: oversized head, huge pointy ears, big eyes
+
+  _createChihuahua(params = {}) {
+    const group = new THREE.Group();
+    const { bodySize = 0.15, color = 0x444444 } = params;
+    const bodyMat = this.getMaterial(color);
+
+    // Body — small elongated sphere
+    const body = new THREE.Mesh(new THREE.SphereGeometry(bodySize, 6, 4), bodyMat);
+    body.position.y = bodySize + 0.06;
+    body.scale.z = 1.2;
+    group.add(body);
+
+    // Head — oversized apple dome (0.7x body ratio)
+    const headSize = bodySize * 0.7;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(headSize, 6, 5), bodyMat);
+    head.position.set(0, bodySize + 0.06 + bodySize * 0.55, bodySize * 1.1);
+    group.add(head);
+
+    // Eyes — big round eyes with white sclera + dark pupil
+    const scleraMat = this.getMaterial(0xffffff);
+    const pupilMat = this.getMaterial(0x111111);
+    const eyeRadius = headSize * 0.22;
+    for (const side of [-1, 1]) {
+      const sclera = new THREE.Mesh(new THREE.SphereGeometry(eyeRadius, 5, 4), scleraMat);
+      sclera.position.set(
+        side * headSize * 0.45,
+        head.position.y + headSize * 0.15,
+        head.position.z + headSize * 0.75
+      );
+      group.add(sclera);
+
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(eyeRadius * 0.55, 4, 4), pupilMat);
+      pupil.position.set(
+        side * headSize * 0.45,
+        head.position.y + headSize * 0.15,
+        head.position.z + headSize * 0.75 + eyeRadius * 0.5
+      );
+      group.add(pupil);
+    }
+
+    // Ears — huge pointy cones
+    const earHeight = bodySize * 0.9;
+    const earGeo = new THREE.ConeGeometry(bodySize * 0.22, earHeight, 4);
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(earGeo, bodyMat);
+      ear.position.set(
+        side * headSize * 0.55,
+        head.position.y + headSize * 0.7,
+        head.position.z - headSize * 0.1
+      );
+      ear.rotation.z = side * -0.25;
+      group.add(ear);
+    }
+
+    // Nose — tiny dark sphere
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(headSize * 0.1, 4, 4), pupilMat);
+    nose.position.set(0, head.position.y - headSize * 0.1, head.position.z + headSize * 0.9);
+    group.add(nose);
+
+    // Legs — tiny thin legs
+    const legHeight = 0.06;
+    const legGeo = new THREE.CylinderGeometry(0.015, 0.015, legHeight, 4);
+    const legSpreadX = bodySize * 0.55;
+    const legSpreadZ = bodySize * 0.6;
+    for (const [lx, lz] of [
+      [-legSpreadX, legSpreadZ], [legSpreadX, legSpreadZ],
+      [-legSpreadX, -legSpreadZ], [legSpreadX, -legSpreadZ],
+    ]) {
+      const leg = new THREE.Mesh(legGeo, bodyMat);
+      leg.position.set(lx, legHeight / 2, lz);
+      group.add(leg);
+    }
+
+    // Tail — thin curled-up tail
+    const tailSeg = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.02, bodySize * 0.6, 4), bodyMat
+    );
+    tailSeg.position.set(0, bodySize + 0.06 + bodySize * 0.2, -bodySize * 1.1);
+    tailSeg.rotation.x = -0.9;
+    group.add(tailSeg);
+
+    group.userData.parts = { body, head, tail: [tailSeg] };
+    group.castShadow = true;
+    return group;
+  }
+
+  // ── Labrador ───────────────────────────────────
+  // Large athletic dog: proportional head, floppy ears, strong build
+
+  _createLabrador(params = {}) {
+    const group = new THREE.Group();
+    const { bodySize = 0.35, color = 0x1a1a1a } = params;
+    const bodyMat = this.getMaterial(color);
+
+    // Body — large elongated sphere
+    const body = new THREE.Mesh(new THREE.SphereGeometry(bodySize, 6, 4), bodyMat);
+    body.position.y = bodySize + 0.18;
+    body.scale.z = 1.4;
+    group.add(body);
+
+    // Head — proportional (0.5x body ratio)
+    const headSize = bodySize * 0.5;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(headSize, 6, 5), bodyMat);
+    head.position.set(0, bodySize + 0.18 + bodySize * 0.4, bodySize * 1.3);
+    group.add(head);
+
+    // Snout — elongated box for Labrador muzzle
+    const snout = new THREE.Mesh(
+      new THREE.BoxGeometry(headSize * 0.6, headSize * 0.4, headSize * 0.6, 1, 1, 1), bodyMat
+    );
+    snout.position.set(0, head.position.y - headSize * 0.2, head.position.z + headSize * 0.7);
+    group.add(snout);
+
+    // Nose — dark sphere at snout tip
+    const noseMat = this.getMaterial(0x111111);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(headSize * 0.12, 4, 4), noseMat);
+    nose.position.set(0, head.position.y - headSize * 0.15, head.position.z + headSize * 1.0);
+    group.add(nose);
+
+    // Eyes — friendly eyes with white sclera + dark pupil
+    const scleraMat = this.getMaterial(0xffffff);
+    const pupilMat = this.getMaterial(0x221100);
+    const eyeRadius = headSize * 0.16;
+    for (const side of [-1, 1]) {
+      const sclera = new THREE.Mesh(new THREE.SphereGeometry(eyeRadius, 5, 4), scleraMat);
+      sclera.position.set(
+        side * headSize * 0.4,
+        head.position.y + headSize * 0.2,
+        head.position.z + headSize * 0.7
+      );
+      group.add(sclera);
+
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(eyeRadius * 0.6, 4, 4), pupilMat);
+      pupil.position.set(
+        side * headSize * 0.4,
+        head.position.y + headSize * 0.2,
+        head.position.z + headSize * 0.7 + eyeRadius * 0.45
+      );
+      group.add(pupil);
+    }
+
+    // Ears — floppy hanging half-spheres (not pointy cones)
+    const earGeo = new THREE.SphereGeometry(headSize * 0.35, 5, 4, 0, Math.PI);
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(earGeo, bodyMat);
+      ear.position.set(
+        side * headSize * 0.7,
+        head.position.y - headSize * 0.1,
+        head.position.z - headSize * 0.15
+      );
+      ear.rotation.x = 0.5;
+      ear.rotation.z = side * 0.3;
+      group.add(ear);
+    }
+
+    // Legs — strong thick legs
+    const legHeight = 0.18;
+    const legGeo = new THREE.CylinderGeometry(0.04, 0.04, legHeight, 4);
+    const legSpreadX = bodySize * 0.55;
+    const legSpreadZ = bodySize * 0.7;
+    for (const [lx, lz] of [
+      [-legSpreadX, legSpreadZ], [legSpreadX, legSpreadZ],
+      [-legSpreadX, -legSpreadZ], [legSpreadX, -legSpreadZ],
+    ]) {
+      const leg = new THREE.Mesh(legGeo, bodyMat);
+      leg.position.set(lx, legHeight / 2, lz);
+      group.add(leg);
+    }
+
+    // Tail — straight sturdy tail
+    const tailSeg = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.04, bodySize * 0.8, 4), bodyMat
+    );
+    tailSeg.position.set(0, bodySize + 0.18, -bodySize * 1.3);
+    tailSeg.rotation.x = -0.4;
+    group.add(tailSeg);
+
+    group.userData.parts = { body, head, tail: [tailSeg] };
     group.castShadow = true;
     return group;
   }
