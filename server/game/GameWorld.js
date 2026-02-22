@@ -5,7 +5,7 @@
 
 import { v4 as uuid } from 'uuid';
 import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA, FERTILIZER_DATA, FORAGE_ITEMS, PROFESSIONS } from '../../shared/constants.js';
-import { isValidTile, tileIndex } from '../../shared/TileMap.js';
+import { isValidTile, tileIndex, tileToWorld } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { DecorationGenerator } from './DecorationGenerator.js';
 import { MapInstance } from './MapInstance.js';
@@ -154,11 +154,6 @@ export class GameWorld {
         farmMap.crops.set(crop.id, crop);
       }
     }
-
-    // Shipping bin on farm
-    farmMap.buildings.set('shipping_bin', {
-      id: 'shipping_bin', type: 'shipping_bin', tileX: 30, tileZ: 32,
-    });
 
     // Spawn starter animals
     const starterAnimals = [
@@ -380,7 +375,7 @@ export class GameWorld {
 
     const skills = this._loadPlayerSkills(playerId);
     const professions = row.professions ? JSON.parse(row.professions) : {};
-    const player = new Player({ id: playerId, name: data.name || row.name, skills, professions });
+    const player = new Player({ id: playerId, name: data.name || row.name, skills, professions, appearance: data.appearance });
     player.socketId = socket.id;
     this.players.set(socket.id, player);
 
@@ -442,9 +437,11 @@ export class GameWorld {
     const oldMap = player.currentMap;
     const newMap = portal.targetMap;
 
+    // Convert tile-based spawn to world coords (consistent with movement coords)
+    const spawnWorld = tileToWorld(portal.spawnX, portal.spawnZ);
     player.currentMap = newMap;
-    player.x = portal.spawnX;
-    player.z = portal.spawnZ;
+    player.x = spawnWorld.x;
+    player.z = spawnWorld.z;
 
     // Notify players on old map that this player left
     this._broadcastToMap(oldMap, ACTIONS.PLAYER_LEAVE, { playerId: player.id }, socketId);
@@ -461,8 +458,8 @@ export class GameWorld {
       type: 'mapTransition',
       mapId: newMap,
       mapState,
-      spawnX: portal.spawnX,
-      spawnZ: portal.spawnZ,
+      spawnX: spawnWorld.x,
+      spawnZ: spawnWorld.z,
       season: this.time.season,
       forageItems,
     });
@@ -579,52 +576,22 @@ export class GameWorld {
     if (idx < 0 || idx >= map.tiles.length) return;
     if (map.tiles[idx].type !== TILE_TYPES.WATER) return;
 
-    // Phase 1: Send cast confirmation with bobber position
-    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
-      type: 'fishCast',
-      playerId: player.id,
-      x: data.x,
-      z: data.z,
-    });
+    const location = 'pond';
+    const fish = this.fishCalc.rollCatch(location, player.level);
 
-    // Phase 2: After random delay (1.5-4s), resolve the catch
-    const biteDelay = 1500 + Math.random() * 2500;
-    setTimeout(() => {
-      if (!this.players.has(socketId)) return;
-
-      const location = 'pond';
-      const fish = this.fishCalc.rollCatch(location, player.level);
-
-      // Send bite event
-      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
-        type: 'fishBite',
-        playerId: player.id,
-        x: data.x,
-        z: data.z,
+    if (fish) {
+      player.addItem(fish.id, 1);
+      player.addSkillXP(SKILLS.FISHING, 5 + fish.rarity * 10);
+      this._checkPendingProfession(socketId, player);
+      this._broadcastToMap(player.currentMap, ACTIONS.WORLD_UPDATE, {
+        type: 'fishCaught', playerId: player.id, fish,
       });
-
-      // Auto-resolve after bite animation
-      setTimeout(() => {
-        if (!this.players.has(socketId)) return;
-
-        if (fish) {
-          player.addItem(fish.id, 1);
-          player.addSkillXP(SKILLS.FISHING, 5 + fish.rarity * 10);
-          this._checkPendingProfession(socketId, player);
-          logger.debug('FISH', `${player.name} caught ${fish.id} (rarity ${fish.rarity})`);
-          this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
-            type: 'fishCaught', playerId: player.id, fish,
-            x: data.x, z: data.z,
-          });
-          this._sendInventoryUpdate(socketId, player);
-        } else {
-          logger.debug('FISH', `${player.name} missed (no fish available at ${location})`);
-          this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
-            type: 'fishMiss', playerId: player.id,
-          });
-        }
-      }, 500);
-    }, biteDelay);
+      this._sendInventoryUpdate(socketId, player);
+    } else {
+      this._broadcastToMap(player.currentMap, ACTIONS.WORLD_UPDATE, {
+        type: 'fishMiss', playerId: player.id,
+      });
+    }
   }
 
   handleNPCTalk(socketId, data) {
@@ -655,10 +622,8 @@ export class GameWorld {
     }
 
     const dialogue = npc.getDialogue(rel.hearts);
-    const shopItems = this._getShopItems(npc);
     const emitData = {
-      type: 'npcDialogue', npcId: npc.id, npcName: npc.name, npcRole: npc.role,
-      text: dialogue, hearts: rel.hearts, shopItems,
+      type: 'npcDialogue', npcId: npc.id, npcName: npc.name, text: dialogue, hearts: rel.hearts,
     };
 
     // Include upgrade options for Blacksmith
@@ -673,7 +638,6 @@ export class GameWorld {
       emitData.upgradeOptions = upgradeOptions;
     }
 
-    logger.debug('NPC', `${player.name} talked to ${npc.name}`, { hearts: rel.hearts });
     this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, emitData);
   }
 
@@ -910,37 +874,6 @@ export class GameWorld {
       type: 'craftCollected', buildingId: building.id,
       itemId: recipe.output, quantity: recipe.count || 1,
     });
-  }
-
-  _getShopItems(npc) {
-    switch (npc.role) {
-      case 'Baker':
-        return Object.entries(cropsData)
-          .filter(([_, c]) => c.buyPrice > 0)
-          .map(([id, c]) => ({
-            itemId: id + '_seed',
-            name: id.replace(/_/g, ' ') + ' seeds',
-            price: c.buyPrice,
-            season: c.season,
-          }));
-      case 'Fisherman':
-        return [
-          { itemId: 'bait', name: 'Bait', price: 5 },
-          { itemId: 'crab_pot', name: 'Crab Pot', price: 200 },
-        ];
-      case 'Veterinarian':
-        return [
-          { itemId: 'hay', name: 'Hay', price: 50 },
-          { itemId: 'animal_medicine', name: 'Animal Medicine', price: 150 },
-        ];
-      case 'Blacksmith':
-        return [
-          { itemId: 'copper_bar', name: 'Copper Bar', price: 120 },
-          { itemId: 'iron_bar', name: 'Iron Bar', price: 250 },
-        ];
-      default:
-        return null;
-    }
   }
 
   handleShopBuy(socketId, data) {

@@ -18,10 +18,9 @@ export class SprinklerRenderer {
 
     // Base cylinder
     const baseGeo = new THREE.CylinderGeometry(0.08, 0.1, 0.12, 6);
-    const baseMat = new THREE.MeshLambertMaterial({
+    const baseMat = new THREE.MeshPhongMaterial({
       color: data.type === 'sprinkler_iridium' ? 0x8844aa :
              data.type === 'sprinkler_quality' ? 0xccaa44 : 0x888888,
-      flatShading: true,
     });
     const base = new THREE.Mesh(baseGeo, baseMat);
     base.position.y = 0.06;

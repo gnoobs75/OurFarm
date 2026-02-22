@@ -18,8 +18,7 @@ export class DecorationRenderer {
   }
 
   /** Build all decoration meshes from server data */
-  build(decorations, season = 0) {
-    this._season = season;
+  build(decorations) {
     // Partition into statics vs trees
     const statics = [];
     const trees = [];
@@ -111,7 +110,7 @@ export class DecorationRenderer {
       const worldZ = dec.z * TILE_SIZE + TILE_SIZE / 2;
       const seed = dec.x * 1000 + dec.z;
 
-      const group = this.assetGen.createTree(dec.variant, seed, this._season);
+      const group = this.assetGen.createTree(dec.variant, seed);
       group.position.set(worldX, 0, worldZ);
       group.rotation.y = dec.rotation || 0;
       group.updateMatrixWorld(true);
@@ -140,23 +139,21 @@ export class DecorationRenderer {
 
       // Create sway-enabled material via onBeforeCompile
       const uTime = { value: 0 };
-      const mat = new THREE.MeshLambertMaterial({
+      const mat = new THREE.MeshPhongMaterial({
         color: colorHex,
-        flatShading: true,
       });
       mat.onBeforeCompile = (shader) => {
         shader.uniforms.uTime = uTime;
-        // Inject sway: gentle sine rotation based on world X position
+        // Declare the custom uniform in the vertex shader
+        shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader;
+        // Inject sway: gentle wind offset scaled by height (ground stays fixed)
         shader.vertexShader = shader.vertexShader.replace(
           '#include <begin_vertex>',
           `#include <begin_vertex>
-           float swayAngle = sin(uTime.x + position.x * 0.5) * 0.012;
-           float cs = cos(swayAngle);
-           float sn = sin(swayAngle);
-           transformed.x = position.x * cs - position.z * sn;
-           transformed.z = position.x * sn + position.z * cs;`
+           float sway = sin(uTime * 1.5 + position.x * 0.5 + position.z * 0.3) * 0.015 * position.y;
+           transformed.x += sway;
+           transformed.z += sway * 0.6;`
         );
-        shader.uniforms.uTime = uTime;
       };
 
       this._swayMaterials.push(uTime);
@@ -170,12 +167,6 @@ export class DecorationRenderer {
 
       for (const g of geometries) g.dispose();
     }
-  }
-
-  /** Rebuild all decorations for a new season */
-  rebuild(decorations, season) {
-    this.dispose();
-    this.build(decorations, season);
   }
 
   /** Per-frame update — advance GPU sway time */

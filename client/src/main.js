@@ -26,9 +26,8 @@ import { DialogueUI } from './ui/DialogueUI.js';
 import { CraftingUI } from './ui/CraftingUI.js';
 import { ProfessionUI } from './ui/ProfessionUI.js';
 import { DebugWindow } from './ui/DebugWindow.js';
-import { ShopUI } from './ui/ShopUI.js';
-import { FishingEffects } from './effects/FishingEffects.js';
-import { ParticleEffects } from './effects/ParticleEffects.js';
+import { SplashScreen } from './ui/SplashScreen.js';
+import { SelectionManager } from './ui/SelectionManager.js';
 import { getToolAction, isSeed } from './ui/ItemIcons.js';
 import { tileToWorld } from '@shared/TileMap.js';
 import { TILE_TYPES } from '@shared/constants.js';
@@ -62,11 +61,6 @@ async function main() {
   const dialogueUI = new DialogueUI(document.getElementById('dialogue-panel'));
   const debugWindow = new DebugWindow();
   debugWindow.setRenderer(sceneManager.renderer);
-  const shopUI = new ShopUI();
-  shopUI.onBuy = (itemId, qty) => network.sendBuy(itemId, qty);
-  shopUI.onSell = (itemId, qty) => network.sendSell(itemId, qty);
-  const fishingFx = new FishingEffects(sceneManager.scene);
-  const particleFx = new ParticleEffects(sceneManager.scene);
   const craftingUI = new CraftingUI();
   const professionUI = new ProfessionUI();
 
@@ -92,11 +86,12 @@ async function main() {
   // --- Network ---
   const network = new NetworkClient();
 
-  // Prompt for player name
-  const playerName = prompt('Enter your farmer name:', 'Farmer') || 'Farmer';
+  // Character customization splash screen
+  const splash = new SplashScreen();
+  const { name: playerName, appearance: playerAppearance } = await splash.show();
 
   try {
-    const state = await network.connect(playerName);
+    const state = await network.connect(playerName, playerAppearance);
 
     // Activate debug instrumentation
     debugClient.init(state.playerId);
@@ -117,9 +112,7 @@ async function main() {
     pets.build(state.pets);
     animals.build(state.animals);
     buildings.build(state.buildings);
-    let currentDecorations = state.decorations || [];
-    let currentSeason = state.time.season;
-    decorations.build(currentDecorations, currentSeason);
+    decorations.build(state.decorations || []);
     sprinklers.build(state.sprinklers || []);
     machines.build(state.machines || []);
     forage.build(state.forageItems || []);
@@ -157,20 +150,27 @@ async function main() {
     }
     hud.updateTime(state.time);
     hud.updateWeather(state.weather.weather);
-    sceneManager.updateTimeOfDay(state.time.hour);
     hud.updateMap(state.mapId || 'farm');
 
-    // Center camera on player
+    // Center camera on player and set follow target
     if (localPlayer) {
       sceneManager.panTo(localPlayer.x, localPlayer.z);
+      const localMesh = players.getLocalPlayerMesh(state.playerId);
+      if (localMesh) sceneManager.setFollowTarget(localMesh);
     }
 
-    // --- Track inventory for shop UI ---
-    let currentInventory = localPlayer?.inventory || [];
+    // --- Selection / Hover / Context Menu ---
+    const selectionManager = new SelectionManager(sceneManager.scene, {
+      npcs, animals, pets, machines, crops, forage,
+    }, network);
+
+    input.on('tileHover', (hoverData) => {
+      selectionManager.updateHover(hoverData);
+    });
 
     // --- Right-click: Move player ---
     input.on('tileMove', ({ tile, worldPos }) => {
-      if (dialogueUI.visible || shopUI.visible) return;
+      if (dialogueUI.visible) return;
 
       // Check for machine interaction
       const machineId = machines.getMachineAtPosition(worldPos.x, worldPos.z);
@@ -215,8 +215,18 @@ async function main() {
     });
 
     // --- Left-click: Perform tool/item action ---
-    input.on('tileAction', ({ tile, worldPos }) => {
-      if (dialogueUI.visible) return;
+    input.on('tileAction', ({ tile, worldPos, button }) => {
+      if (dialogueUI.visible || selectionManager.hasContextMenu()) {
+        selectionManager.hideContextMenu();
+        return;
+      }
+
+      // Check for entity — show context menu instead of tool action
+      const entity = selectionManager.getEntityAt(worldPos);
+      if (entity) {
+        selectionManager.showContextMenu(entity, input.hoveredScreenPos || { x: 0, y: 0 });
+        return;
+      }
 
       const activeItem = hud.getActiveItem();
       if (!activeItem) return;
@@ -259,11 +269,7 @@ async function main() {
 
     // --- Keyboard shortcuts ---
     input.on('keyDown', ({ key }) => {
-      if (key === 'Escape') {
-        if (shopUI.visible) shopUI.hide();
-        else if (inventoryUI.visible) inventoryUI.toggle();
-      }
-      if (key === 'e' || key === 'E' || key === 'i' || key === 'I') inventoryUI.toggle();
+      if (key === 'i' || key === 'I') inventoryUI.toggle();
       if (key === 'F3') debugWindow.toggle();
       if (key === 'c' || key === 'C') {
         if (craftingUI.visible) {
@@ -292,73 +298,30 @@ async function main() {
       switch (data.type) {
         case 'playerMove':
           players.updatePosition(data.playerId, data.x, data.z);
-          if (data.playerId === network.playerId) {
-            sceneManager.panTo(data.x, data.z);
-          }
           break;
         case 'tileChange':
           terrain.updateTile(data.x, data.z, data.tileType);
-          if (data.tileType === 6) { // TILLED
-            const { x: wx, z: wz } = tileToWorld(data.x, data.z);
-            particleFx.tillDust(wx, wz);
-          }
           break;
         case 'cropPlanted':
           crops.addCrop(data.crop);
-          particleFx.plantLeaves(
-            data.crop.tileX + 0.5,
-            data.crop.tileZ + 0.5
-          );
           break;
         case 'cropWatered':
-          if (data.x !== undefined && data.z !== undefined) {
-            const { x: wwx, z: wwz } = tileToWorld(data.x, data.z);
-            particleFx.waterDrops(wwx, wwz);
-          }
           break;
         case 'cropUpdate':
           crops.updateCrop(data.crop);
           break;
         case 'cropHarvested':
-          if (data.x !== undefined && data.z !== undefined) {
-            const { x: hx, z: hz } = tileToWorld(data.x, data.z);
-            particleFx.harvestBurst(hx, hz);
-          }
           crops.removeCrop(data.cropId);
           break;
-        case 'fishCast':
-          if (data.playerId === network.playerId) {
-            fishingFx.cast(data.x, data.z);
-          }
-          break;
-        case 'fishBite':
-          if (data.playerId === network.playerId) {
-            fishingFx.bite();
-          }
-          break;
         case 'fishCaught':
-          if (data.playerId === network.playerId) {
-            fishingFx.catchResult(true);
-          }
-          console.log('Caught:', data.fish.name || data.fish.id);
+          console.log('Caught:', data.fish.name);
           break;
         case 'fishMiss':
-          if (data.playerId === network.playerId) {
-            fishingFx.catchResult(false);
-          }
           console.log('The fish got away...');
           break;
         case 'npcDialogue':
           dialogueUI._npcId = data.npcId;
-          if (data.shopItems && data.shopItems.length > 0) {
-            dialogueUI.show(data.npcName, data.text, [], data.upgradeOptions || null);
-            setTimeout(() => {
-              dialogueUI.hide();
-              shopUI.show(data.npcName, data.shopItems, currentInventory);
-            }, 1500);
-          } else {
-            dialogueUI.show(data.npcName, data.text, [], data.upgradeOptions || null);
-          }
+          dialogueUI.show(data.npcName, data.text, [], data.upgradeOptions || null);
           break;
         case 'animalUpdate':
           // Update the animal data stored in renderer
@@ -453,8 +416,9 @@ async function main() {
             buildingsMap[b.id] = b;
           }
 
-          // Reposition player
+          // Reposition player and snap camera
           if (data.spawnX !== undefined) {
+            players.updatePosition(network.playerId, data.spawnX, data.spawnZ);
             sceneManager.panTo(data.spawnX, data.spawnZ);
           }
           hud.updateMap(data.mapId);
@@ -463,15 +427,7 @@ async function main() {
       }
     });
 
-    network.on('timeUpdate', (data) => {
-      hud.updateTime(data);
-      sceneManager.updateTimeOfDay(data.hour);
-      if (data.season !== undefined && data.season !== currentSeason) {
-        currentSeason = data.season;
-        decorations.rebuild(currentDecorations, currentSeason);
-        terrain.build(state.tiles, currentSeason);
-      }
-    });
+    network.on('timeUpdate', (data) => hud.updateTime(data));
     network.on('weatherUpdate', (data) => {
       hud.updateWeather(data.weather);
       weather.setWeather(data.weather);
@@ -480,8 +436,6 @@ async function main() {
       hud.updateStats(data);
       hud.syncQuantities(data.inventory);
       inventoryUI.update(data.inventory);
-      currentInventory = data.inventory;
-      shopUI.updateInventory(data.inventory);
       if (localPlayer) localPlayer.inventory = data.inventory;
     });
     network.on('playerJoin', (data) => {
@@ -502,8 +456,9 @@ async function main() {
       npcs.update(delta);
       pets.update(delta);
       animals.update(delta);
-      fishingFx.update(delta);
-      particleFx.update(delta);
+
+      // Smooth camera follow
+      sceneManager.updateCamera(delta);
 
       // Debug window
       debugWindow.update(delta);

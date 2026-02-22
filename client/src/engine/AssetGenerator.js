@@ -14,8 +14,8 @@ export class AssetGenerator {
   getMaterial(color, options = {}) {
     const key = `${color}-${JSON.stringify(options)}`;
     if (!this._matCache.has(key)) {
-      this._matCache.set(key, new THREE.MeshLambertMaterial({
-        color, flatShading: true, ...options,
+      this._matCache.set(key, new THREE.MeshPhongMaterial({
+        color, ...options,
       }));
     }
     return this._matCache.get(key);
@@ -49,7 +49,7 @@ export class AssetGenerator {
   //  TREES — 3 variants: oak, pine, fruit
   // ═══════════════════════════════════════════════
 
-  createTree(variant = 0, seed = 0, season = 0) {
+  createTree(variant = 0, seed = 0) {
     const group = new THREE.Group();
     const r = this._seededRand(seed, variant);
     const trunkH = 0.6 + r * 0.5;
@@ -65,10 +65,8 @@ export class AssetGenerator {
     group.add(trunk);
 
     if (variant % 3 === 1) {
-      // ── Pine: evergreen, only slightly changes in winter ──
-      const pineColors = season === 3
-        ? [0x2a5533, 0x2e5e38, 0x326840]
-        : [0x1a5c2a, 0x1e6b30, 0x227a38];
+      // ── Pine: 3 stacked dark cones ──
+      const pineColors = [0x1a5c2a, 0x1e6b30, 0x227a38];
       for (let i = 0; i < 3; i++) {
         const cone = new THREE.Mesh(
           new THREE.ConeGeometry(0.55 - i * 0.12, 0.5 + i * 0.05, 6),
@@ -79,36 +77,9 @@ export class AssetGenerator {
         group.add(cone);
       }
     } else {
-      // ── Oak / Fruit tree: season-dependent foliage ──
+      // ── Oak / Fruit tree: overlapping sphere clusters ──
       const isOak = variant % 3 === 0;
-      let leafColor;
-
-      if (season === 0) {         // Spring — bright fresh green
-        leafColor = isOak ? 0x3da85a : 0x4dbb6a;
-      } else if (season === 1) {  // Summer — deeper green
-        leafColor = isOak ? 0x2d8a4e : 0x3da85a;
-      } else if (season === 2) {  // Fall — orange/red/gold
-        const fallColors = [0xdd6622, 0xcc4411, 0xddaa22, 0xbb3300, 0xeeaa44];
-        leafColor = fallColors[Math.floor(this._seededRand(seed, 99) * fallColors.length)];
-      } else {                    // Winter — bare branches, no foliage
-        for (let i = 0; i < 3; i++) {
-          const cr = this._seededRand(seed + i, variant + i);
-          const branch = new THREE.Mesh(
-            new THREE.CylinderGeometry(0.02, 0.01, 0.3, 3),
-            this.getMaterial(0x5a3a2a)
-          );
-          branch.position.set(
-            (cr - 0.5) * 0.3,
-            trunkH + 0.1 + i * 0.15,
-            (this._seededRand(seed + i + 5, variant) - 0.5) * 0.3
-          );
-          branch.rotation.set(cr * 0.5, cr * 2, (cr - 0.5) * 0.8);
-          group.add(branch);
-        }
-        group.userData.type = 'tree';
-        return group;
-      }
-
+      const leafColor = isOak ? 0x2d8a4e : 0x3da85a;
       const clusterCount = 2 + Math.floor(r * 2);
 
       for (let i = 0; i < clusterCount; i++) {
@@ -127,7 +98,7 @@ export class AssetGenerator {
         group.add(sphere);
       }
 
-      // Fruit tree gets small colored dots (spring/summer/fall only)
+      // Fruit tree gets small colored dots
       if (!isOak) {
         const fruitColors = [0xe74c3c, 0xff6b35, 0xf5d142];
         for (let i = 0; i < 5; i++) {
@@ -334,28 +305,14 @@ export class AssetGenerator {
 
   createCrop(cropType, stage) {
     const colors = {
-      // Spring
-      parsnip: 0xf5e6c8, cauliflower: 0xf0f0f0, potato: 0x8b7355,
-      garlic: 0xf5f5dc, kale: 0x2d6b4a, rhubarb: 0xcc3355,
-      strawberry: 0xff3366, coffee_bean: 0x6b3a2a,
-      // Summer
-      melon: 0x66cc66, tomato: 0xe74c3c, hot_pepper: 0xff4422,
-      blueberry: 0x4169e1, corn: 0xf5d142, wheat: 0xdaa520,
-      radish: 0xee4466, starfruit: 0xffdd00,
-      // Fall
-      pumpkin: 0xff7518, yam: 0xcc6633, eggplant: 0x6633aa,
-      cranberry: 0xcc2244, grape: 0x6644aa, artichoke: 0x558844,
-      bok_choy: 0x44aa44, sunflower: 0xffcc00,
-      // Multi-season
-      carrot: 0xff8c00, ancient_fruit: 0x8844cc,
+      wheat: 0xdaa520, corn: 0xf5d142, tomato: 0xe74c3c, carrot: 0xff8c00,
+      potato: 0x8b7355, strawberry: 0xff3366, pumpkin: 0xff7518, blueberry: 0x4169e1,
     };
 
-    // Special crop models
-    if (cropType === 'corn') return this._createCorn(stage);
-    if (cropType === 'pumpkin') return this._createPumpkin(stage);
-    if (cropType === 'melon') return this._createMelon(stage);
-    if (cropType === 'sunflower') return this._createSunflower(stage);
-    if (cropType === 'cauliflower') return this._createCauliflower(stage);
+    // Corn gets special tall treatment
+    if (cropType === 'corn') {
+      return this._createCorn(stage);
+    }
 
     const group = new THREE.Group();
     const scale = 0.2 + stage * 0.27;
@@ -450,182 +407,6 @@ export class AssetGenerator {
     return group;
   }
 
-  _createPumpkin(stage) {
-    const group = new THREE.Group();
-    const scale = 0.15 + stage * 0.2;
-
-    const stem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.015, 0.02, scale * 0.5, 4),
-      this.getMaterial(0x2d5a1e)
-    );
-    stem.position.y = scale * 0.25;
-    group.add(stem);
-
-    if (stage >= 2) {
-      for (let i = 0; i < 3; i++) {
-        const leaf = new THREE.Mesh(
-          new THREE.SphereGeometry(0.08, 5, 3),
-          this.getMaterial(0x3d8a30)
-        );
-        leaf.position.set(Math.cos(i * 2.1) * 0.15, 0.1, Math.sin(i * 2.1) * 0.15);
-        leaf.scale.y = 0.4;
-        group.add(leaf);
-      }
-    }
-
-    if (stage >= 3) {
-      const pumpkin = new THREE.Mesh(
-        new THREE.SphereGeometry(0.18, 7, 5),
-        this.getMaterial(0xff7518)
-      );
-      pumpkin.position.y = 0.12;
-      pumpkin.scale.y = 0.75;
-      group.add(pumpkin);
-
-      const nub = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.02, 0.03, 0.06, 4),
-        this.getMaterial(0x3d5a1e)
-      );
-      nub.position.y = 0.22;
-      group.add(nub);
-    }
-
-    group.castShadow = true;
-    return group;
-  }
-
-  _createMelon(stage) {
-    const group = new THREE.Group();
-    const scale = 0.15 + stage * 0.2;
-
-    const stem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.015, 0.02, scale * 0.5, 4),
-      this.getMaterial(0x2d5a1e)
-    );
-    stem.position.y = scale * 0.25;
-    group.add(stem);
-
-    if (stage >= 2) {
-      const leaf = new THREE.Mesh(
-        new THREE.SphereGeometry(0.1, 5, 3), this.getMaterial(0x3d9930)
-      );
-      leaf.position.y = scale * 0.4;
-      leaf.scale.y = 0.5;
-      group.add(leaf);
-    }
-
-    if (stage >= 3) {
-      const melon = new THREE.Mesh(
-        new THREE.SphereGeometry(0.16, 7, 5), this.getMaterial(0x66cc66)
-      );
-      melon.position.y = 0.1;
-      melon.scale.set(1.2, 0.8, 1);
-      group.add(melon);
-
-      const stripe = new THREE.Mesh(
-        new THREE.SphereGeometry(0.165, 7, 5), this.getMaterial(0x449944, { transparent: true, opacity: 0.3 })
-      );
-      stripe.position.y = 0.1;
-      stripe.scale.set(0.4, 0.82, 1.02);
-      group.add(stripe);
-    }
-
-    group.castShadow = true;
-    return group;
-  }
-
-  _createSunflower(stage) {
-    const group = new THREE.Group();
-    const stalkH = 0.15 + stage * 0.25;
-
-    const stalk = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.015, 0.025, stalkH, 4),
-      this.getMaterial(0x2d6a1e)
-    );
-    stalk.position.y = stalkH / 2;
-    group.add(stalk);
-
-    if (stage >= 2) {
-      for (let i = 0; i < 4; i++) {
-        const leaf = new THREE.Mesh(
-          new THREE.PlaneGeometry(0.18, 0.06),
-          this.getMaterial(0x3d8a30, { side: THREE.DoubleSide })
-        );
-        leaf.position.set(0, stalkH * 0.3 + i * stalkH * 0.15, 0);
-        leaf.rotation.set(0.3, i * 1.57, (i % 2 ? 0.4 : -0.4));
-        group.add(leaf);
-      }
-    }
-
-    if (stage >= 3) {
-      const center = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.1, 0.1, 0.04, 8),
-        this.getMaterial(0x553311)
-      );
-      center.position.y = stalkH;
-      center.rotation.x = 0.3;
-      group.add(center);
-
-      for (let i = 0; i < 10; i++) {
-        const petal = new THREE.Mesh(
-          new THREE.SphereGeometry(0.04, 4, 3),
-          this.getMaterial(0xffcc00)
-        );
-        const a = (i / 10) * Math.PI * 2;
-        petal.position.set(
-          Math.cos(a) * 0.12,
-          stalkH + Math.sin(a) * 0.03,
-          Math.sin(a) * 0.12
-        );
-        group.add(petal);
-      }
-    }
-
-    group.castShadow = true;
-    return group;
-  }
-
-  _createCauliflower(stage) {
-    const group = new THREE.Group();
-    const scale = 0.2 + stage * 0.2;
-
-    const stem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.02, 0.03, scale * 0.4, 4),
-      this.getMaterial(0x2d5a1e)
-    );
-    stem.position.y = scale * 0.2;
-    group.add(stem);
-
-    if (stage >= 1) {
-      for (let i = 0; i < 4; i++) {
-        const leaf = new THREE.Mesh(
-          new THREE.SphereGeometry(0.1, 5, 3),
-          this.getMaterial(0x3d9930)
-        );
-        const a = (i / 4) * Math.PI * 2;
-        leaf.position.set(Math.cos(a) * 0.08, scale * 0.2, Math.sin(a) * 0.08);
-        leaf.scale.y = 0.4;
-        group.add(leaf);
-      }
-    }
-
-    if (stage >= 3) {
-      for (let i = 0; i < 5; i++) {
-        const bump = new THREE.Mesh(
-          new THREE.SphereGeometry(0.05 + Math.random() * 0.03, 5, 4),
-          this.getMaterial(0xf0f0f0)
-        );
-        const a = (i / 5) * Math.PI * 2;
-        const r = i === 0 ? 0 : 0.04;
-        bump.position.set(Math.cos(a) * r, scale * 0.35 + 0.02, Math.sin(a) * r);
-        group.add(bump);
-      }
-    }
-
-    group.castShadow = true;
-    return group;
-  }
-
   // ═══════════════════════════════════════════════
   //  BUILDINGS — house, barn, coop, mill, shop
   // ═══════════════════════════════════════════════
@@ -633,21 +414,13 @@ export class AssetGenerator {
   createBuilding(type) {
     const group = new THREE.Group();
     const configs = {
-      house:       { w: 2, h: 1.5, d: 2, color: 0xc4956a, roofColor: 0x8b4513 },
-      barn:        { w: 3, h: 2, d: 2.5, color: 0xcc3333, roofColor: 0x5c2a0e },
-      coop:        { w: 1.5, h: 1, d: 1.5, color: 0xdeb887, roofColor: 0x8b6914 },
-      mill:        { w: 1.5, h: 2.5, d: 1.5, color: 0xf5f5dc, roofColor: 0x666666 },
-      shop:        { w: 2, h: 1.5, d: 2, color: 0x6495ed, roofColor: 0x4169e1 },
-      bakery:      { w: 2.2, h: 1.6, d: 2, color: 0xf5c07a, roofColor: 0xcc6633 },
-      blacksmith:  { w: 2.5, h: 1.8, d: 2.2, color: 0x555555, roofColor: 0x333333 },
-      library:     { w: 2, h: 1.8, d: 2.5, color: 0x8866aa, roofColor: 0x554477 },
-      fishing_hut: { w: 1.5, h: 1.2, d: 1.5, color: 0x88aacc, roofColor: 0x336699 },
-      town_hall:   { w: 3, h: 2.2, d: 2.5, color: 0xddd8c4, roofColor: 0x445566 },
-      vet_clinic:  { w: 2, h: 1.5, d: 2, color: 0xaaddaa, roofColor: 0x558855 },
-      shipping_bin:{ w: 0.8, h: 0.5, d: 0.8, color: 0x8b6b4a, roofColor: 0x6b4a2a },
+      house: { w: 2, h: 1.5, d: 2, color: 0xc4956a, roofColor: 0x8b4513 },
+      barn:  { w: 3, h: 2, d: 2.5, color: 0xcc3333, roofColor: 0x5c2a0e },
+      coop:  { w: 1.5, h: 1, d: 1.5, color: 0xdeb887, roofColor: 0x8b6914 },
+      mill:  { w: 1.5, h: 2.5, d: 1.5, color: 0xf5f5dc, roofColor: 0x666666 },
+      shop:  { w: 2, h: 1.5, d: 2, color: 0x6495ed, roofColor: 0x4169e1 },
     };
     const cfg = configs[type] || configs.house;
-    const isShippingBin = type === 'shipping_bin';
 
     // Walls
     const walls = new THREE.Mesh(
@@ -658,47 +431,42 @@ export class AssetGenerator {
     walls.receiveShadow = true;
     group.add(walls);
 
-    // Roof — pyramid (hidden for shipping bin)
+    // Roof — pyramid
     const roof = new THREE.Mesh(
       new THREE.ConeGeometry(cfg.w * 0.85, cfg.h * 0.45, 4), this.getMaterial(cfg.roofColor)
     );
     roof.position.y = cfg.h + cfg.h * 0.225;
     roof.rotation.y = Math.PI / 4;
     roof.castShadow = true;
-    if (isShippingBin) roof.visible = false;
     group.add(roof);
 
-    // Door (hidden for shipping bin)
+    // Door
     const door = new THREE.Mesh(
       new THREE.PlaneGeometry(0.4, 0.65), this.getMaterial(0x4a2a0e)
     );
     door.position.set(0, 0.325, cfg.d / 2 + 0.01);
-    if (isShippingBin) door.visible = false;
     group.add(door);
 
-    // Door knob (hidden for shipping bin)
+    // Door knob
     const knob = new THREE.Mesh(
       new THREE.SphereGeometry(0.02, 4, 3), this.getMaterial(0xdaa520)
     );
     knob.position.set(0.12, 0.35, cfg.d / 2 + 0.02);
-    if (isShippingBin) knob.visible = false;
     group.add(knob);
 
-    // Windows — front + sides, soft glow (skip for shipping bin)
-    if (!isShippingBin) {
-      const windowMat = this.getMaterial(0xaaddff, { emissive: 0x334455, emissiveIntensity: 0.3 });
-      for (const side of [-1, 1]) {
-        // Front windows flanking door
-        const win = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.25), windowMat);
-        win.position.set(side * cfg.w * 0.3, cfg.h * 0.6, cfg.d / 2 + 0.01);
-        group.add(win);
+    // Windows — front + sides, soft glow
+    const windowMat = this.getMaterial(0xaaddff, { emissive: 0x334455, emissiveIntensity: 0.3 });
+    for (const side of [-1, 1]) {
+      // Front windows flanking door
+      const win = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.25), windowMat);
+      win.position.set(side * cfg.w * 0.3, cfg.h * 0.6, cfg.d / 2 + 0.01);
+      group.add(win);
 
-        // Side windows
-        const sideWin = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.25), windowMat);
-        sideWin.position.set(side * (cfg.w / 2 + 0.01), cfg.h * 0.6, 0);
-        sideWin.rotation.y = Math.PI / 2;
-        group.add(sideWin);
-      }
+      // Side windows
+      const sideWin = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.25), windowMat);
+      sideWin.position.set(side * (cfg.w / 2 + 0.01), cfg.h * 0.6, 0);
+      sideWin.rotation.y = Math.PI / 2;
+      group.add(sideWin);
     }
 
     // ── House extras: chimney + porch ──
@@ -737,98 +505,6 @@ export class AssetGenerator {
         hay.castShadow = true;
         group.add(hay);
       }
-    }
-
-    // ── Bakery extras: chimney + warm glow doorway ──
-    if (type === 'bakery') {
-      const chimney = new THREE.Mesh(
-        new THREE.BoxGeometry(0.25, 0.6, 0.25), this.getMaterial(0x884433)
-      );
-      chimney.position.set(cfg.w * 0.3, cfg.h + cfg.h * 0.35, -cfg.d * 0.2);
-      chimney.castShadow = true;
-      group.add(chimney);
-
-      // Warm glow around the doorway
-      const glow = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.5, 0.7),
-        this.getMaterial(0xffaa44, { emissive: 0xff8833, emissiveIntensity: 0.5 })
-      );
-      glow.position.set(0, 0.35, cfg.d / 2 + 0.005);
-      group.add(glow);
-    }
-
-    // ── Blacksmith extras: anvil outside + chimney ──
-    if (type === 'blacksmith') {
-      // Chimney (taller, darker)
-      const chimney = new THREE.Mesh(
-        new THREE.BoxGeometry(0.3, 0.8, 0.3), this.getMaterial(0x444444)
-      );
-      chimney.position.set(-cfg.w * 0.25, cfg.h + cfg.h * 0.4, -cfg.d * 0.2);
-      chimney.castShadow = true;
-      group.add(chimney);
-
-      // Anvil — dark block with a flat top
-      const anvilBase = new THREE.Mesh(
-        new THREE.BoxGeometry(0.3, 0.25, 0.2), this.getMaterial(0x333333)
-      );
-      anvilBase.position.set(cfg.w / 2 + 0.5, 0.125, 0.3);
-      anvilBase.castShadow = true;
-      group.add(anvilBase);
-
-      const anvilTop = new THREE.Mesh(
-        new THREE.BoxGeometry(0.4, 0.08, 0.25), this.getMaterial(0x444444)
-      );
-      anvilTop.position.set(cfg.w / 2 + 0.5, 0.29, 0.3);
-      anvilTop.castShadow = true;
-      group.add(anvilTop);
-    }
-
-    // ── Town Hall extras: clock face + flag pole with flag ──
-    if (type === 'town_hall') {
-      // Clock face on the front wall
-      const clockFace = new THREE.Mesh(
-        new THREE.CircleGeometry(0.2, 8),
-        this.getMaterial(0xfffff0)
-      );
-      clockFace.position.set(0, cfg.h * 0.85, cfg.d / 2 + 0.015);
-      group.add(clockFace);
-
-      // Clock rim
-      const clockRim = new THREE.Mesh(
-        new THREE.RingGeometry(0.19, 0.22, 12),
-        this.getMaterial(0x8b7355)
-      );
-      clockRim.position.set(0, cfg.h * 0.85, cfg.d / 2 + 0.02);
-      group.add(clockRim);
-
-      // Flag pole
-      const pole = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.02, 0.02, 1.2, 4),
-        this.getMaterial(0x888888)
-      );
-      pole.position.set(cfg.w / 2 + 0.3, cfg.h * 0.6 + 0.6, cfg.d / 2 - 0.3);
-      pole.castShadow = true;
-      group.add(pole);
-
-      // Flag
-      const flag = new THREE.Mesh(
-        new THREE.PlaneGeometry(0.4, 0.25),
-        this.getMaterial(0xcc2222, { side: THREE.DoubleSide })
-      );
-      flag.position.set(cfg.w / 2 + 0.3 + 0.22, cfg.h * 0.6 + 1.05, cfg.d / 2 - 0.3);
-      group.add(flag);
-    }
-
-    // ── Shipping Bin extras: open-top box with dark interior ──
-    if (isShippingBin) {
-      // Dark interior visible from above
-      const interior = new THREE.Mesh(
-        new THREE.PlaneGeometry(cfg.w * 0.85, cfg.d * 0.85),
-        this.getMaterial(0x2a1a0e)
-      );
-      interior.rotation.x = -Math.PI / 2;
-      interior.position.y = cfg.h + 0.01;
-      group.add(interior);
     }
 
     return group;
@@ -924,7 +600,15 @@ export class AssetGenerator {
 
   createNPC(params = {}) {
     const group = new THREE.Group();
-    const { skinColor = 0xffcc99, shirtColor = 0x4488cc, hairColor = 0x332211 } = params;
+    const {
+      skinColor = 0xffcc99,
+      shirtColor = 0x4488cc,
+      hairColor = 0x332211,
+      pantsColor = 0x334455,
+      hairStyle = 'round',
+      eyeStyle = 'dots',
+      mouthStyle = 'smile',
+    } = params;
 
     // Body
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.25), this.getMaterial(shirtColor));
@@ -936,15 +620,80 @@ export class AssetGenerator {
     head.position.y = 1.2;
     group.add(head);
 
-    // Hair
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 5), this.getMaterial(hairColor));
-    hair.position.y = 1.28;
-    hair.scale.set(1, 0.6, 1);
+    // Hair — style variants
+    let hair;
+    const hairMat = this.getMaterial(hairColor);
+    if (hairStyle === 'spiked') {
+      hair = new THREE.Group();
+      for (let i = 0; i < 5; i++) {
+        const spike = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.18, 4), hairMat);
+        const angle = (i / 5) * Math.PI * 2;
+        spike.position.set(Math.cos(angle) * 0.1, 0.08, Math.sin(angle) * 0.1);
+        spike.rotation.set(Math.sin(angle) * 0.4, 0, Math.cos(angle) * 0.4);
+        hair.add(spike);
+      }
+      // Center spike
+      const center = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.22, 4), hairMat);
+      center.position.y = 0.1;
+      hair.add(center);
+      hair.position.y = 1.28;
+    } else if (hairStyle === 'long') {
+      hair = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 5), hairMat);
+      hair.position.y = 1.25;
+      hair.scale.set(1.05, 1.1, 1.15);
+    } else {
+      // 'round' — default
+      hair = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 5), hairMat);
+      hair.position.y = 1.28;
+      hair.scale.set(1, 0.6, 1);
+    }
     group.add(hair);
+
+    // Eyes
+    const eyeMat = this.getMaterial(0x222222);
+    if (eyeStyle === 'ovals') {
+      for (const side of [-1, 1]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 4, 3), eyeMat);
+        eye.scale.set(1, 1.4, 0.5);
+        eye.position.set(side * 0.06, 1.22, 0.16);
+        group.add(eye);
+      }
+    } else if (eyeStyle === 'closed') {
+      for (const side of [-1, 1]) {
+        const eye = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, 0.01), eyeMat);
+        eye.position.set(side * 0.06, 1.21, 0.16);
+        group.add(eye);
+      }
+    } else {
+      // 'dots' — default
+      for (const side of [-1, 1]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.02, 4, 3), eyeMat);
+        eye.position.set(side * 0.06, 1.22, 0.16);
+        group.add(eye);
+      }
+    }
+
+    // Mouth
+    const mouthMat = this.getMaterial(0x553333);
+    if (mouthStyle === 'neutral') {
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.01, 0.01), mouthMat);
+      mouth.position.set(0, 1.13, 0.17);
+      group.add(mouth);
+    } else if (mouthStyle === 'open') {
+      const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.02, 5, 4), mouthMat);
+      mouth.position.set(0, 1.12, 0.17);
+      group.add(mouth);
+    } else {
+      // 'smile' — curved line approximated by tilted thin box
+      const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.01, 0.01), mouthMat);
+      mouth.position.set(0, 1.13, 0.17);
+      mouth.rotation.z = 0.1;
+      group.add(mouth);
+    }
 
     // Legs — wrap each in a pivot so rotation swings from the hip
     const legGeo = new THREE.BoxGeometry(0.12, 0.4, 0.15);
-    const legMat = this.getMaterial(0x334455);
+    const legMat = this.getMaterial(pantsColor);
 
     const leftLegPivot = new THREE.Group();
     leftLegPivot.position.set(-0.1, 0.4, 0); // hip height
@@ -985,12 +734,13 @@ export class AssetGenerator {
       leftArmPivot, rightArmPivot,
     };
 
-    group.castShadow = true;
+    // Enable shadow casting on each child mesh (Group.castShadow doesn't propagate)
+    group.traverse(child => { if (child.isMesh) child.castShadow = true; });
     return group;
   }
 
-  createPlayer(color = 0x4488ff) {
-    return this.createNPC({ shirtColor: color });
+  createPlayer(appearance = {}) {
+    return this.createNPC({ shirtColor: 0x4488ff, ...appearance });
   }
 
   // ═══════════════════════════════════════════════

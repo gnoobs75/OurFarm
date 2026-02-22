@@ -1,12 +1,15 @@
 // server/entities/Player.js
 import { SKILLS, SKILL_MAX_LEVEL, xpForSkillLevel, PROFESSIONS } from '../../shared/constants.js';
+import { tileToWorld } from '../../shared/TileMap.js';
+
+const DEFAULT_SPAWN = tileToWorld(32, 32); // center of tile 32,32
 
 export class Player {
   constructor(data) {
     this.id = data.id;
     this.name = data.name || 'Farmer';
-    this.x = data.x ?? 32;
-    this.z = data.z ?? 32;
+    this.x = data.x ?? DEFAULT_SPAWN.x;
+    this.z = data.z ?? DEFAULT_SPAWN.z;
     this.coins = data.coins ?? 500;
     this.energy = data.energy ?? 100;
     this.maxEnergy = data.maxEnergy ?? 100;
@@ -14,6 +17,7 @@ export class Player {
     this.currentMap = data.currentMap || 'farm';
     this.activeToolSlot = 0;
     this.socketId = data.socketId;
+    this.appearance = data.appearance || {};
     this.toolTiers = data.toolTiers || {
       hoe: 0, watering_can: 0, pickaxe: 0, axe: 0, fishing_rod: 0,
     };
@@ -161,6 +165,7 @@ export class Player {
       professions: this.professions,
       inventory: this.inventory,
       toolTiers: this.toolTiers,
+      appearance: this.appearance,
     };
   }
 }

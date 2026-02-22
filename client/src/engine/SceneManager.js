@@ -64,8 +64,8 @@ export class SceneManager {
 
   _setupLighting() {
     // Ambient — warm soft fill
-    this.ambientLight = new THREE.AmbientLight(0xfff8ee, 0.55);
-    this.scene.add(this.ambientLight);
+    const ambient = new THREE.AmbientLight(0xfff8ee, 0.55);
+    this.scene.add(ambient);
 
     // Sun — warm golden-hour, lower angle for longer shadows
     this.sunLight = new THREE.DirectionalLight(0xffe0a0, 1.1);
@@ -81,59 +81,8 @@ export class SceneManager {
     this.scene.add(this.sunLight);
 
     // Hemisphere — warm sky to earthy ground
-    this.hemiLight = new THREE.HemisphereLight(0x88ccee, 0x4a7a2a, 0.35);
-    this.scene.add(this.hemiLight);
-  }
-
-  /** Update lighting based on game hour (0-24) */
-  updateTimeOfDay(hour) {
-    let ambientIntensity, sunIntensity, ambientColor, sunColor, fogColor;
-
-    if (hour >= 6 && hour < 8) {
-      // Dawn
-      const t = (hour - 6) / 2;
-      ambientIntensity = 0.25 + t * 0.30;
-      sunIntensity = 0.3 + t * 0.8;
-      ambientColor = this._lerpColor(0x334466, 0xfff8ee, t);
-      sunColor = this._lerpColor(0xff8844, 0xffe0a0, t);
-      fogColor = this._lerpColor(0x445566, 0x87ceeb, t);
-    } else if (hour >= 8 && hour < 17) {
-      // Daytime
-      ambientIntensity = 0.55;
-      sunIntensity = 1.1;
-      ambientColor = 0xfff8ee;
-      sunColor = 0xffe0a0;
-      fogColor = 0x87ceeb;
-    } else if (hour >= 17 && hour < 20) {
-      // Sunset
-      const t = (hour - 17) / 3;
-      ambientIntensity = 0.55 - t * 0.35;
-      sunIntensity = 1.1 - t * 0.85;
-      ambientColor = this._lerpColor(0xfff8ee, 0x334466, t);
-      sunColor = this._lerpColor(0xffe0a0, 0xff6633, t);
-      fogColor = this._lerpColor(0x87ceeb, 0x223344, t);
-    } else {
-      // Night (20-6)
-      ambientIntensity = 0.2;
-      sunIntensity = 0.25;
-      ambientColor = 0x334466;
-      sunColor = 0x6677aa;
-      fogColor = 0x223344;
-    }
-
-    this.ambientLight.intensity = ambientIntensity;
-    this.ambientLight.color.setHex(ambientColor);
-    this.sunLight.intensity = sunIntensity;
-    this.sunLight.color.setHex(sunColor);
-    this.scene.fog.color.setHex(fogColor);
-    this.renderer.setClearColor(fogColor);
-  }
-
-  _lerpColor(c1, c2, t) {
-    const a = new THREE.Color(c1);
-    const b = new THREE.Color(c2);
-    a.lerp(b, t);
-    return a.getHex();
+    const hemi = new THREE.HemisphereLight(0x88ccee, 0x4a7a2a, 0.35);
+    this.scene.add(hemi);
   }
 
   /** Move camera to follow a world position */
@@ -145,6 +94,27 @@ export class SceneManager {
       x + isoDistance * Math.cos(isoAngle),
       isoDistance * Math.sin(isoAngle) + 10,
       z + isoDistance * Math.cos(isoAngle)
+    );
+    this.camera.lookAt(this.cameraTarget);
+  }
+
+  /** Set a mesh for the camera to follow smoothly */
+  setFollowTarget(mesh) { this._followTarget = mesh; }
+
+  /** Smooth camera tracking — call every frame */
+  updateCamera(delta) {
+    if (!this._followTarget) return;
+    const tx = this._followTarget.position.x;
+    const tz = this._followTarget.position.z;
+    const CAM_LERP = 4;
+    this.cameraTarget.x += (tx - this.cameraTarget.x) * CAM_LERP * delta;
+    this.cameraTarget.z += (tz - this.cameraTarget.z) * CAM_LERP * delta;
+    const isoAngle = Math.PI / 6;
+    const isoDistance = 50;
+    this.camera.position.set(
+      this.cameraTarget.x + isoDistance * Math.cos(isoAngle),
+      isoDistance * Math.sin(isoAngle) + 10,
+      this.cameraTarget.z + isoDistance * Math.cos(isoAngle)
     );
     this.camera.lookAt(this.cameraTarget);
   }
