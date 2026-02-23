@@ -20,6 +20,7 @@ export class MapInstance {
     this.npcs = [];
     this.sprinklers = new Map();
     this.machines = new Map();
+    this.resources = new Map();
   }
 
   /** Serialize full map state for client consumption */
@@ -34,6 +35,7 @@ export class MapInstance {
       npcs: this.npcs.map(n => n.getState()),
       sprinklers: Array.from(this.sprinklers.values()).map(s => s.getState()),
       machines: Array.from(this.machines.values()).map(m => m.getState()),
+      resources: Array.from(this.resources.values()).map(r => r.getState()),
     };
   }
 

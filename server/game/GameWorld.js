@@ -4,7 +4,7 @@
 // Supports multiple maps (farm, town) with portal transitions.
 
 import { v4 as uuid } from 'uuid';
-import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA, FERTILIZER_DATA, FORAGE_ITEMS, PROFESSIONS } from '../../shared/constants.js';
+import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA, FERTILIZER_DATA, FORAGE_ITEMS, PROFESSIONS, RESOURCE_DATA, HOLD_EXPAND_ENERGY_MULT, DAYS_PER_SEASON } from '../../shared/constants.js';
 import { isValidTile, tileIndex, tileToWorld } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { DecorationGenerator } from './DecorationGenerator.js';
@@ -18,6 +18,7 @@ import { Pet } from '../entities/Pet.js';
 import { Animal } from '../entities/Animal.js';
 import { Sprinkler } from '../entities/Sprinkler.js';
 import { Machine } from '../entities/Machine.js';
+import { Resource } from '../entities/Resource.js';
 import { FishCalculator } from '../entities/Fish.js';
 import { ForagingSystem } from './ForagingSystem.js';
 import { getDB } from '../db/database.js';
@@ -74,14 +75,38 @@ export class GameWorld {
     // Farm map
     const farmTiles = this.terrainGen.generate();
     const farmDecorations = this.decorationGen.generate(farmTiles);
+
+    // Separate trees/rocks into Resource entities (interactive), keep rest as decorations
+    const farmResources = [];
+    const nonResourceDecorations = [];
+    for (const dec of farmDecorations) {
+      if (dec.type === 'tree' || dec.type === 'rock') {
+        farmResources.push(dec);
+      } else {
+        nonResourceDecorations.push(dec);
+      }
+    }
+
     const farmMap = new MapInstance(MAP_IDS.FARM, {
       tiles: farmTiles,
-      decorations: farmDecorations,
+      decorations: nonResourceDecorations,
       portals: [
         // South edge portal → town (north edge)
         { x: 29, z: 61, width: 6, height: 3, targetMap: MAP_IDS.TOWN, spawnX: 31, spawnZ: 3 },
       ],
     });
+
+    // Populate resource entities from extracted trees/rocks
+    for (const dec of farmResources) {
+      const resData = RESOURCE_DATA[dec.type];
+      const resource = new Resource({
+        tileX: dec.x, tileZ: dec.z, type: dec.type,
+        variant: dec.variant || 0,
+        health: resData.health,
+      });
+      farmMap.resources.set(resource.id, resource);
+    }
+
     this.maps.set(MAP_IDS.FARM, farmMap);
 
     // Town map
@@ -1330,6 +1355,210 @@ export class GameWorld {
     return 0;
   }
 
+  // --- Resources (trees/rocks) ---
+
+  handleResourceHit(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+
+    // Find resource at the given tile
+    let resource = null;
+    for (const r of farmMap.resources.values()) {
+      if (r.tileX === data.x && r.tileZ === data.z) {
+        resource = r;
+        break;
+      }
+    }
+    if (!resource) return;
+
+    const resData = RESOURCE_DATA[resource.type];
+    if (!resData) return;
+
+    // Check energy for the required tool
+    const tool = resData.tool;
+    const tierIndex = player.toolTiers?.[tool] || 0;
+    const energyCost = TOOL_ENERGY_COST[tool]?.[tierIndex] || 2;
+    if (!player.useEnergy(energyCost)) return;
+
+    // Determine skill for XP
+    const skill = resource.type === 'tree' ? SKILLS.FORAGING : SKILLS.MINING;
+    player.addSkillXP(skill, resData.xpPerHit || 2);
+    this._checkPendingProfession(socketId, player);
+
+    // Apply hit
+    const destroyed = resource.hit(1);
+
+    if (destroyed) {
+      if (resource.type === 'tree' && !resource.isStump) {
+        // Tree destroyed -> drop items, convert to stump
+        for (const drop of resData.drops) {
+          player.addItem(drop.itemId, drop.quantity);
+        }
+        resource.isStump = true;
+        resource.health = resData.stumpHealth;
+        this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+          type: 'resourceUpdate', resource: resource.getState(),
+        });
+      } else {
+        // Stump or rock destroyed -> drop items, remove from map
+        const drops = resource.isStump ? resData.stumpDrops : resData.drops;
+        if (drops) {
+          for (const drop of drops) {
+            player.addItem(drop.itemId, drop.quantity);
+          }
+        }
+
+        // If rock was on STONE tile, revert to GRASS
+        if (resource.type === 'rock') {
+          const idx = tileIndex(resource.tileX, resource.tileZ);
+          if (idx >= 0 && idx < farmMap.tiles.length && farmMap.tiles[idx].type === TILE_TYPES.STONE) {
+            farmMap.tiles[idx].type = TILE_TYPES.GRASS;
+          }
+        }
+
+        farmMap.resources.delete(resource.id);
+        this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+          type: 'resourceRemoved', resourceId: resource.id, x: resource.tileX, z: resource.tileZ,
+        });
+      }
+      this._sendInventoryUpdate(socketId, player);
+    } else {
+      // Not destroyed — broadcast shake
+      this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+        type: 'resourceHit', resourceId: resource.id, health: resource.health,
+      });
+      this._sendInventoryUpdate(socketId, player);
+    }
+  }
+
+  // --- Multi-tile handlers ---
+
+  handleMultiTill(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!data.tiles || !Array.isArray(data.tiles)) return;
+
+    const tiles = data.tiles.slice(0, 3); // max 3 tiles
+    const baseCost = TOOL_ENERGY_COST.hoe[player.toolTiers?.hoe || 0] || 2;
+    const energyCost = Math.ceil(HOLD_EXPAND_ENERGY_MULT * baseCost);
+    if (!player.useEnergy(energyCost)) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const changedTiles = [];
+
+    for (const t of tiles) {
+      if (!isValidTile(t.x, t.z)) continue;
+      const idx = tileIndex(t.x, t.z);
+      const tile = farmMap.tiles[idx];
+      if (tile.type !== TILE_TYPES.DIRT && tile.type !== TILE_TYPES.GRASS) continue;
+      tile.type = TILE_TYPES.TILLED;
+      changedTiles.push({ x: t.x, z: t.z, tileType: TILE_TYPES.TILLED });
+    }
+
+    if (changedTiles.length > 0) {
+      this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+        type: 'tileChangeBatch', tiles: changedTiles,
+      });
+    }
+  }
+
+  handleMultiWater(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!data.tiles || !Array.isArray(data.tiles)) return;
+
+    const tiles = data.tiles.slice(0, 3);
+    const baseCost = TOOL_ENERGY_COST.watering_can[player.toolTiers?.watering_can || 0] || 1;
+    const energyCost = Math.ceil(HOLD_EXPAND_ENERGY_MULT * baseCost);
+    if (!player.useEnergy(energyCost)) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const wateredCrops = [];
+
+    for (const t of tiles) {
+      for (const crop of farmMap.crops.values()) {
+        if (crop.tileX === t.x && crop.tileZ === t.z) {
+          crop.watered = true;
+          wateredCrops.push(crop.id);
+          break;
+        }
+      }
+    }
+
+    if (wateredCrops.length > 0) {
+      this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+        type: 'cropWateredBatch', cropIds: wateredCrops,
+      });
+    }
+  }
+
+  handleMultiPlant(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!data.tiles || !Array.isArray(data.tiles) || !data.cropType) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    const seedId = data.cropType + '_seed';
+    const plantedCrops = [];
+
+    for (const t of data.tiles) {
+      if (!player.hasItem(seedId)) break;
+      if (!isValidTile(t.x, t.z)) continue;
+
+      const idx = tileIndex(t.x, t.z);
+      if (farmMap.tiles[idx].type !== TILE_TYPES.TILLED) continue;
+
+      // Check no existing crop at this tile
+      let occupied = false;
+      for (const crop of farmMap.crops.values()) {
+        if (crop.tileX === t.x && crop.tileZ === t.z) { occupied = true; break; }
+      }
+      if (occupied) continue;
+
+      player.removeItem(seedId, 1);
+      const crop = new Crop({ tileX: t.x, tileZ: t.z, cropType: data.cropType });
+      farmMap.crops.set(crop.id, crop);
+      plantedCrops.push(crop.getState());
+    }
+
+    if (plantedCrops.length > 0) {
+      this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+        type: 'cropPlantedBatch', crops: plantedCrops,
+      });
+      this._sendInventoryUpdate(socketId, player);
+    }
+  }
+
+  // --- Rest at House ---
+
+  handleRestAtHouse(socketId) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+
+    // Must be near house (within ~4 tiles)
+    const house = this.maps.get(MAP_IDS.FARM).buildings.get('house_main');
+    if (!house) return;
+    const hx = house.tileX + 2, hz = house.tileZ + 1;
+    const px = Math.floor(player.x), pz = Math.floor(player.z);
+    if (Math.abs(px - hx) > 4 || Math.abs(pz - hz) > 4) return;
+
+    // Advance to 6 AM next day
+    this.time.hour = 6.0;
+    this.time.day++;
+    if (this.time.day > DAYS_PER_SEASON) {
+      this.time.day = 1;
+      this.time.season = (this.time.season + 1) % 4;
+      this._onNewSeason(this.time.season);
+    }
+
+    this._onNewDay();
+    this.io.emit(ACTIONS.TIME_UPDATE, this.time.getState());
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, { type: 'restComplete' });
+    this._broadcastWorldUpdate();
+  }
+
   // --- Professions ---
 
   _getProfessionOptions(player, skill, level) {
@@ -1450,10 +1679,11 @@ export class GameWorld {
       const pets = Array.from(map.pets.values()).map(p => p.getState());
       const sprinklers = Array.from(map.sprinklers.values()).map(s => s.getState());
       const machines = Array.from(map.machines.values()).map(m => m.getState());
+      const resources = Array.from(map.resources.values()).map(r => r.getState());
       const forageItems = player.currentMap === MAP_IDS.FARM
         ? this.farmForaging.getState()
         : this.townForaging.getState();
-      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, { type: 'fullSync', crops, animals, pets, sprinklers, machines, forageItems });
+      this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, { type: 'fullSync', crops, animals, pets, sprinklers, machines, resources, forageItems });
     }
   }
 
@@ -1480,6 +1710,7 @@ export class GameWorld {
       npcs: mapState.npcs,
       sprinklers: mapState.sprinklers,
       machines: mapState.machines,
+      resources: mapState.resources,
       players: samePlayers,
       buildings: mapState.buildings,
       time: this.time.getState(),
