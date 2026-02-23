@@ -89,6 +89,11 @@ export class NetworkClient {
   sendForageCollect(x, z) { this.socket.emit(ACTIONS.FORAGE_COLLECT, { x, z }); }
   sendShipItem(itemId, quantity = 1) { this.socket.emit(ACTIONS.SHIP_ITEM, { itemId, quantity }); }
   sendProfessionChoice(skill, professionId) { this.socket.emit(ACTIONS.PROFESSION_CHOICE, { skill, professionId }); }
+  sendResourceHit(tileX, tileZ) { this.socket.emit(ACTIONS.RESOURCE_HIT, { x: tileX, z: tileZ }); }
+  sendMultiTill(tiles) { this.socket.emit(ACTIONS.MULTI_TILL, { tiles }); }
+  sendMultiWater(tiles) { this.socket.emit(ACTIONS.MULTI_WATER, { tiles }); }
+  sendMultiPlant(tiles, cropType) { this.socket.emit(ACTIONS.MULTI_PLANT, { tiles, cropType }); }
+  sendRestAtHouse() { this.socket.emit(ACTIONS.REST_AT_HOUSE); }
   sendChat(message) { this.socket.emit(ACTIONS.CHAT_MESSAGE, { message }); }
 
   // ─── Event system ───
