@@ -29,6 +29,8 @@ export class NPC {
       x: this.currentX, z: this.currentZ,
       personality: this.personality,
       skinColor: this.skinColor, shirtColor: this.shirtColor, hairColor: this.hairColor,
+      hairStyle: this.hairStyle || 'round',
+      accessory: this.accessory || null,
     };
   }
 }
