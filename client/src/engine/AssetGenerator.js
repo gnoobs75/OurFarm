@@ -615,7 +615,7 @@ export class AssetGenerator {
       group.add(foot);
     }
 
-    group.userData.parts = { body, head, comb, beak, tail, legs, wings };
+    group.userData.parts = { body, head, comb, beak, tail, legs, wings, legL: legs[0], legR: legs[1] };
     group.userData.animalType = 'chicken';
     group.traverse(child => { if (child.isMesh) child.castShadow = true; });
     return group;
@@ -735,7 +735,7 @@ export class AssetGenerator {
 
     group.userData.parts = {
       body, head, snout, tail,
-      ears,
+      ears, earL: ears[0], earR: ears[1],
       legs,
     };
     group.userData.animalType = 'cow';
@@ -814,7 +814,7 @@ export class AssetGenerator {
       group.add(hoof);
     }
 
-    group.userData.parts = { body, head, tail, ears, legs };
+    group.userData.parts = { body, head, tail, ears, earL: ears[0], earR: ears[1], legs };
     group.userData.animalType = 'sheep';
     group.traverse(child => { if (child.isMesh) child.castShadow = true; });
     return group;
@@ -908,7 +908,7 @@ export class AssetGenerator {
       group.add(hoof);
     }
 
-    group.userData.parts = { body, head, beard, tail, horns, ears, legs };
+    group.userData.parts = { body, head, beard, tail, horns, ears, earL: ears[0], earR: ears[1], legs };
     group.userData.animalType = 'goat';
     group.traverse(child => { if (child.isMesh) child.castShadow = true; });
     return group;

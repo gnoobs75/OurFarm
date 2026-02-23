@@ -202,7 +202,7 @@ export class AnimalRenderer {
 
       case 'tailFlick': {
         if (!parts.tail) break;
-        parts.tail.rotation.z = Math.sin(t * 30) * 0.3;
+        parts.tail.rotation.z = Math.sin(t * 30) * 0.3 * Math.max(0, 1 - t / 0.6);
         break;
       }
 
