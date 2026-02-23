@@ -106,6 +106,11 @@ export const ACTIONS = {
   WEATHER_UPDATE: 'weather:update',
   INVENTORY_UPDATE: 'inventory:update',
   CHAT_MESSAGE: 'chat:message',
+  RESOURCE_HIT: 'farm:resourceHit',
+  MULTI_TILL: 'farm:multiTill',
+  MULTI_WATER: 'farm:multiWater',
+  MULTI_PLANT: 'farm:multiPlant',
+  REST_AT_HOUSE: 'player:rest',
 };
 
 // Skills
@@ -275,3 +280,11 @@ export const PROFESSIONS = {
     },
   },
 };
+
+export const RESOURCE_DATA = {
+  tree: { health: 5, drops: [{ itemId: 'wood', quantity: 8 }], stumpHealth: 2, stumpDrops: [{ itemId: 'wood', quantity: 2 }], tool: 'axe', xpPerHit: 2 },
+  rock: { health: 3, drops: [{ itemId: 'stone', quantity: 5 }], tool: 'pickaxe', xpPerHit: 2 },
+};
+
+export const HOLD_EXPAND_TILES = 3;  // 1x3 row
+export const HOLD_EXPAND_ENERGY_MULT = 2; // 2x energy for 3 tiles

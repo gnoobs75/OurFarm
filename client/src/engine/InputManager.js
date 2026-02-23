@@ -17,6 +17,7 @@ export class InputManager {
     this._handlers = {
       tileClick: [],
       tileAction: [],
+      tileActionExpanded: [],
       tileMove: [],
       tileHover: [],
       keyDown: [],
@@ -59,6 +60,9 @@ export class InputManager {
   _onPointerDown(e) {
     this.isDragging = false;
     this.dragStart = this._getPointerPos(e);
+    if (e.button === 0) {
+      this._pointerDownTime = Date.now();
+    }
   }
 
   _onPointerMove(e) {
@@ -107,7 +111,13 @@ export class InputManager {
       if (e.button === 2) {
         this._emit('tileMove', data);
       } else {
-        this._emit('tileAction', data);
+        // Check for hold-to-expand
+        const holdDuration = Date.now() - (this._pointerDownTime || 0);
+        if (holdDuration > 300) {
+          this._emit('tileActionExpanded', data);
+        } else {
+          this._emit('tileAction', data);
+        }
       }
       // Backward compatibility
       this._emit('tileClick', data);

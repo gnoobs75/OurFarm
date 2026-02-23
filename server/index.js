@@ -182,6 +182,17 @@ io.on('connection', (socket) => {
   // Foraging
   wrap(ACTIONS.FORAGE_COLLECT, (data) => world.handleForageCollect(socket.id, data));
 
+  // Resources (trees/rocks)
+  wrap(ACTIONS.RESOURCE_HIT, (data) => world.handleResourceHit(socket.id, data));
+
+  // Multi-tile actions
+  wrap(ACTIONS.MULTI_TILL, (data) => world.handleMultiTill(socket.id, data));
+  wrap(ACTIONS.MULTI_WATER, (data) => world.handleMultiWater(socket.id, data));
+  wrap(ACTIONS.MULTI_PLANT, (data) => world.handleMultiPlant(socket.id, data));
+
+  // Rest at house
+  wrap(ACTIONS.REST_AT_HOUSE, () => world.handleRestAtHouse(socket.id));
+
   // Profession choice
   wrap(ACTIONS.PROFESSION_CHOICE, (data) => world.handleProfessionChoice(socket.id, data));
 

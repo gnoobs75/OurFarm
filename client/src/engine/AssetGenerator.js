@@ -5,6 +5,25 @@
 
 import * as THREE from 'three';
 
+const CROP_CATEGORIES = {
+  parsnip: 'root', potato: 'root', carrot: 'root', garlic: 'root', beet: 'root', yam: 'root',
+  tomato: 'vine', strawberry: 'vine', blueberry: 'vine', grape: 'vine', hot_pepper: 'vine', cranberry: 'vine',
+  corn: 'tall', wheat: 'tall', coffee_bean: 'tall',
+  cauliflower: 'bush', red_cabbage: 'bush', kale: 'bush', artichoke: 'bush',
+  sunflower: 'flower', ancient_fruit: 'flower',
+  melon: 'gourd', pumpkin: 'gourd', starfruit: 'gourd',
+};
+
+const CROP_COLORS = {
+  parsnip: 0xf5e6c8, potato: 0x8b7355, carrot: 0xff8c00, garlic: 0xf5f0e0,
+  beet: 0x8b0000, yam: 0xcc6633, tomato: 0xe74c3c, strawberry: 0xff3366,
+  blueberry: 0x4169e1, grape: 0x6b3fa0, hot_pepper: 0xff4500, cranberry: 0xdc143c,
+  corn: 0xf5d142, wheat: 0xdaa520, coffee_bean: 0x6b4226,
+  cauliflower: 0xf5f5f5, red_cabbage: 0x8b2252, kale: 0x228b22, artichoke: 0x6b8e23,
+  sunflower: 0xffd700, ancient_fruit: 0x9932cc,
+  melon: 0x90ee90, pumpkin: 0xff7518, starfruit: 0xffd700,
+};
+
 export class AssetGenerator {
   constructor() {
     this._matCache = new Map();
@@ -126,6 +145,51 @@ export class AssetGenerator {
     }
 
     group.userData.type = 'tree';
+    return group;
+  }
+
+  createStump(variant = 0) {
+    const group = new THREE.Group();
+    const r = this._seededRand(variant, 77);
+
+    // Main stump body — short cylinder
+    const stump = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.15, 0.18, 0.1, 6),
+      this.getMaterial(0x8b6914)
+    );
+    stump.position.y = 0.05;
+    stump.castShadow = true;
+    group.add(stump);
+
+    // Ring detail on top — lighter color torus
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.08, 0.01, 4, 8),
+      this.getMaterial(0xa0824a)
+    );
+    ring.position.y = 0.1;
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+
+    // Optional roots: 2-3 small flattened cylinders at base, angled outward
+    const rootCount = 2 + Math.floor(r * 2);
+    for (let i = 0; i < rootCount; i++) {
+      const angle = (i / rootCount) * Math.PI * 2 + r;
+      const root = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.03, 0.12, 4),
+        this.getMaterial(0x6b4a14)
+      );
+      root.position.set(
+        Math.cos(angle) * 0.15,
+        0.02,
+        Math.sin(angle) * 0.15
+      );
+      root.rotation.z = Math.cos(angle) * 0.8;
+      root.rotation.x = Math.sin(angle) * 0.8;
+      root.scale.y = 0.5; // flatten
+      group.add(root);
+    }
+
+    group.userData.type = 'stump';
     return group;
   }
 
@@ -312,29 +376,590 @@ export class AssetGenerator {
   // ═══════════════════════════════════════════════
 
   createCrop(cropType, stage) {
-    const colors = {
-      wheat: 0xdaa520, corn: 0xf5d142, tomato: 0xe74c3c, carrot: 0xff8c00,
-      potato: 0x8b7355, strawberry: 0xff3366, pumpkin: 0xff7518, blueberry: 0x4169e1,
-    };
+    const category = CROP_CATEGORIES[cropType] || 'generic';
+    switch (category) {
+      case 'root':   return this._createRootCrop(cropType, stage);
+      case 'vine':   return this._createVineCrop(cropType, stage);
+      case 'tall':   return this._createTallCrop(cropType, stage);
+      case 'bush':   return this._createBushCrop(cropType, stage);
+      case 'flower': return this._createFlowerCrop(cropType, stage);
+      case 'gourd':  return this._createGourdCrop(cropType, stage);
+      default:       return this._createGenericCrop(cropType, stage);
+    }
+  }
 
-    // Corn gets special tall treatment
-    if (cropType === 'corn') {
-      return this._createCorn(stage);
+  // ── Seed mound shared by all crops at stage 0 ──
+
+  _addSeedMound(group) {
+    const mound = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 5, 3),
+      this.getMaterial(0x6b4226)
+    );
+    mound.position.y = 0.02;
+    mound.scale.y = 0.5;
+    group.add(mound);
+  }
+
+  // ── Root crops: parsnip, potato, carrot, garlic, beet, yam ──
+
+  _createRootCrop(cropType, stage) {
+    const group = new THREE.Group();
+    const color = CROP_COLORS[cropType] || 0x44aa22;
+
+    if (stage === 0) { this._addSeedMound(group); }
+    else if (stage === 1) {
+      // 2-3 thin green shoots
+      for (let i = 0; i < 3; i++) {
+        const shoot = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.012, 0.08, 3),
+          this.getMaterial(0x44aa22)
+        );
+        shoot.position.set((i - 1) * 0.03, 0.04, 0);
+        shoot.rotation.z = (i - 1) * 0.15;
+        group.add(shoot);
+      }
+    } else if (stage === 2) {
+      // Taller stems + bushy green top
+      for (let i = 0; i < 3; i++) {
+        const stem = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.012, 0.14, 3),
+          this.getMaterial(0x338822)
+        );
+        stem.position.set((i - 1) * 0.03, 0.07, 0);
+        stem.rotation.z = (i - 1) * 0.1;
+        group.add(stem);
+      }
+      const top = new THREE.Mesh(
+        new THREE.SphereGeometry(0.1, 5, 4),
+        this.getMaterial(0x338822)
+      );
+      top.position.y = 0.16;
+      top.scale.y = 0.7;
+      group.add(top);
+    } else if (stage === 3) {
+      // Green top + colored root tip poking out
+      for (let i = 0; i < 3; i++) {
+        const stem = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.012, 0.16, 3),
+          this.getMaterial(0x338822)
+        );
+        stem.position.set((i - 1) * 0.03, 0.08, 0);
+        stem.rotation.z = (i - 1) * 0.1;
+        group.add(stem);
+      }
+      const top = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 5, 4),
+        this.getMaterial(0x2d7a1e)
+      );
+      top.position.y = 0.18;
+      top.scale.y = 0.65;
+      group.add(top);
+      // Root tip partially buried
+      const root = new THREE.Mesh(
+        new THREE.ConeGeometry(0.04, 0.1, 5),
+        this.getMaterial(color)
+      );
+      root.position.y = -0.02;
+      root.rotation.x = Math.PI; // point downward
+      group.add(root);
     }
 
+    group.castShadow = true;
+    return group;
+  }
+
+  // ── Vine crops: tomato, strawberry, blueberry, grape, hot_pepper, cranberry ──
+
+  _createVineCrop(cropType, stage) {
+    const group = new THREE.Group();
+    const color = CROP_COLORS[cropType] || 0xe74c3c;
+
+    if (stage === 0) { this._addSeedMound(group); }
+    else if (stage === 1) {
+      // Small vine shoot, thin curved stem
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.01, 0.015, 0.1, 4),
+        this.getMaterial(0x2d7a1e)
+      );
+      stem.position.y = 0.05;
+      stem.rotation.z = 0.15;
+      group.add(stem);
+      const leaf = new THREE.Mesh(
+        new THREE.SphereGeometry(0.03, 4, 3),
+        this.getMaterial(0x44aa22)
+      );
+      leaf.position.set(0.02, 0.1, 0);
+      leaf.scale.y = 0.5;
+      group.add(leaf);
+    } else if (stage === 2) {
+      // Small trellis frame + green leaves
+      const brown = this.getMaterial(0x6b4226);
+      // Trellis posts
+      for (const x of [-0.06, 0.06]) {
+        const post = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.008, 0.25, 3), brown
+        );
+        post.position.set(x, 0.125, 0);
+        group.add(post);
+      }
+      // Trellis crossbar
+      const bar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.006, 0.006, 0.14, 3), brown
+      );
+      bar.position.y = 0.22;
+      bar.rotation.z = Math.PI / 2;
+      group.add(bar);
+      // Leaves on trellis
+      for (let i = 0; i < 3; i++) {
+        const leaf = new THREE.Mesh(
+          new THREE.SphereGeometry(0.04, 4, 3),
+          this.getMaterial(0x3d9930)
+        );
+        leaf.position.set((i - 1) * 0.05, 0.14 + i * 0.03, 0.02);
+        leaf.scale.y = 0.5;
+        group.add(leaf);
+      }
+    } else if (stage === 3) {
+      // Trellis + hanging colored fruit
+      const brown = this.getMaterial(0x6b4226);
+      for (const x of [-0.06, 0.06]) {
+        const post = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.008, 0.3, 3), brown
+        );
+        post.position.set(x, 0.15, 0);
+        group.add(post);
+      }
+      const bar = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.006, 0.006, 0.14, 3), brown
+      );
+      bar.position.y = 0.27;
+      bar.rotation.z = Math.PI / 2;
+      group.add(bar);
+      // Leaves
+      for (let i = 0; i < 4; i++) {
+        const leaf = new THREE.Mesh(
+          new THREE.SphereGeometry(0.04, 4, 3),
+          this.getMaterial(0x2d7a1e)
+        );
+        leaf.position.set((i - 1.5) * 0.04, 0.16 + (i % 2) * 0.06, 0.02);
+        leaf.scale.y = 0.5;
+        group.add(leaf);
+      }
+      // Hanging fruit spheres
+      const fruitMat = this.getMaterial(color);
+      const fruitPositions = [[-0.04, 0.12, 0.03], [0.04, 0.14, -0.02], [0, 0.1, 0.04], [0.03, 0.18, -0.01]];
+      for (const [fx, fy, fz] of fruitPositions) {
+        const fruit = new THREE.Mesh(
+          new THREE.SphereGeometry(0.025, 5, 4), fruitMat
+        );
+        fruit.position.set(fx, fy, fz);
+        group.add(fruit);
+      }
+    }
+
+    group.castShadow = true;
+    return group;
+  }
+
+  // ── Tall crops: corn, wheat, coffee_bean ──
+
+  _createTallCrop(cropType, stage) {
+    if (cropType === 'corn') return this._createCorn(stage);
+
+    const group = new THREE.Group();
+    const color = CROP_COLORS[cropType] || 0xdaa520;
+    const isWheat = cropType === 'wheat';
+
+    if (stage === 0) { this._addSeedMound(group); }
+    else if (stage === 1) {
+      // Thin green stalks
+      for (let i = 0; i < 3; i++) {
+        const stalk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.012, 0.12, 3),
+          this.getMaterial(0x44aa22)
+        );
+        stalk.position.set((i - 1) * 0.025, 0.06, 0);
+        stalk.rotation.z = (i - 1) * 0.08;
+        group.add(stalk);
+      }
+    } else if (stage === 2) {
+      // Taller stalks in crop color
+      const stalkColor = isWheat ? 0x9aaa30 : 0x338822;
+      for (let i = 0; i < 4; i++) {
+        const stalk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.014, 0.22, 3),
+          this.getMaterial(stalkColor)
+        );
+        stalk.position.set((i - 1.5) * 0.025, 0.11, (i % 2) * 0.02);
+        stalk.rotation.z = (i - 1.5) * 0.05;
+        group.add(stalk);
+      }
+    } else if (stage === 3) {
+      // Full height stalks with seed heads / beans
+      const stalkColor = isWheat ? 0xbba830 : 0x2d6a1e;
+      for (let i = 0; i < 4; i++) {
+        const stalk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.008, 0.015, 0.3, 3),
+          this.getMaterial(stalkColor)
+        );
+        stalk.position.set((i - 1.5) * 0.025, 0.15, (i % 2) * 0.02);
+        stalk.rotation.z = (i - 1.5) * 0.04;
+        group.add(stalk);
+        // Seed heads / beans on top
+        const head = new THREE.Mesh(
+          new THREE.SphereGeometry(isWheat ? 0.02 : 0.015, 4, 3),
+          this.getMaterial(color)
+        );
+        head.position.set((i - 1.5) * 0.025, 0.3 + (i % 2) * 0.01, (i % 2) * 0.02);
+        if (isWheat) head.scale.y = 1.5;
+        group.add(head);
+      }
+      // Coffee gets a bushy leaf cluster
+      if (!isWheat) {
+        const bush = new THREE.Mesh(
+          new THREE.SphereGeometry(0.08, 5, 4),
+          this.getMaterial(0x2d7a1e)
+        );
+        bush.position.y = 0.2;
+        bush.scale.y = 0.7;
+        group.add(bush);
+      }
+    }
+
+    group.castShadow = true;
+    return group;
+  }
+
+  // ── Bush crops: cauliflower, red_cabbage, kale, artichoke ──
+
+  _createBushCrop(cropType, stage) {
+    const group = new THREE.Group();
+    const color = CROP_COLORS[cropType] || 0x44aa22;
+
+    if (stage === 0) { this._addSeedMound(group); }
+    else if (stage === 1) {
+      // Small leaves spreading
+      for (let i = 0; i < 4; i++) {
+        const leaf = new THREE.Mesh(
+          new THREE.SphereGeometry(0.035, 4, 3),
+          this.getMaterial(0x44aa22)
+        );
+        const angle = (i / 4) * Math.PI * 2;
+        leaf.position.set(Math.cos(angle) * 0.04, 0.03, Math.sin(angle) * 0.04);
+        leaf.scale.y = 0.4;
+        group.add(leaf);
+      }
+    } else if (stage === 2) {
+      // Larger leafy base — overlapping green spheres, flattened
+      for (let i = 0; i < 5; i++) {
+        const leaf = new THREE.Mesh(
+          new THREE.SphereGeometry(0.06, 5, 3),
+          this.getMaterial(0x338822)
+        );
+        const angle = (i / 5) * Math.PI * 2;
+        leaf.position.set(Math.cos(angle) * 0.05, 0.04, Math.sin(angle) * 0.05);
+        leaf.scale.y = 0.4;
+        group.add(leaf);
+      }
+      // Center mound
+      const center = new THREE.Mesh(
+        new THREE.SphereGeometry(0.05, 5, 3),
+        this.getMaterial(0x3d9930)
+      );
+      center.position.y = 0.06;
+      center.scale.y = 0.5;
+      group.add(center);
+    } else if (stage === 3) {
+      // Leaf base + distinctive head
+      for (let i = 0; i < 5; i++) {
+        const leaf = new THREE.Mesh(
+          new THREE.SphereGeometry(0.065, 5, 3),
+          this.getMaterial(0x2d7a1e)
+        );
+        const angle = (i / 5) * Math.PI * 2;
+        leaf.position.set(Math.cos(angle) * 0.06, 0.04, Math.sin(angle) * 0.06);
+        leaf.scale.y = 0.4;
+        group.add(leaf);
+      }
+      if (cropType === 'kale') {
+        // Thick curly green leaves — taller leafy mound
+        for (let i = 0; i < 4; i++) {
+          const kLeaf = new THREE.Mesh(
+            new THREE.SphereGeometry(0.05, 5, 3),
+            this.getMaterial(color)
+          );
+          const angle = (i / 4) * Math.PI * 2;
+          kLeaf.position.set(Math.cos(angle) * 0.03, 0.1 + i * 0.015, Math.sin(angle) * 0.03);
+          kLeaf.scale.set(1, 0.6, 1);
+          group.add(kLeaf);
+        }
+      } else if (cropType === 'artichoke') {
+        // Layered green cone
+        const head = new THREE.Mesh(
+          new THREE.ConeGeometry(0.07, 0.12, 6),
+          this.getMaterial(color)
+        );
+        head.position.y = 0.12;
+        group.add(head);
+      } else {
+        // Cauliflower / red_cabbage — dome head
+        const head = new THREE.Mesh(
+          new THREE.SphereGeometry(0.08, 6, 5),
+          this.getMaterial(color)
+        );
+        head.position.y = 0.12;
+        head.scale.y = 0.7;
+        group.add(head);
+      }
+    }
+
+    group.castShadow = true;
+    return group;
+  }
+
+  // ── Flower crops: sunflower, ancient_fruit ──
+
+  _createFlowerCrop(cropType, stage) {
+    const group = new THREE.Group();
+    const color = CROP_COLORS[cropType] || 0xffd700;
+
+    if (stage === 0) { this._addSeedMound(group); }
+    else if (stage === 1) {
+      // Small green stem with tiny leaf
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.01, 0.015, 0.1, 4),
+        this.getMaterial(0x2d7a1e)
+      );
+      stem.position.y = 0.05;
+      group.add(stem);
+      const leaf = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025, 4, 3),
+        this.getMaterial(0x44aa22)
+      );
+      leaf.position.set(0.03, 0.06, 0);
+      leaf.scale.set(1, 0.4, 0.6);
+      group.add(leaf);
+    } else if (stage === 2) {
+      // Tall stem with bud on top
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.012, 0.018, 0.25, 4),
+        this.getMaterial(0x2d7a1e)
+      );
+      stem.position.y = 0.125;
+      group.add(stem);
+      // Leaves along stem
+      for (const side of [-1, 1]) {
+        const leaf = new THREE.Mesh(
+          new THREE.SphereGeometry(0.03, 4, 3),
+          this.getMaterial(0x3d9930)
+        );
+        leaf.position.set(side * 0.04, 0.12, 0);
+        leaf.scale.set(1, 0.4, 0.6);
+        group.add(leaf);
+      }
+      // Bud
+      const bud = new THREE.Mesh(
+        new THREE.SphereGeometry(0.03, 5, 4),
+        this.getMaterial(0x558822)
+      );
+      bud.position.y = 0.27;
+      bud.scale.y = 1.3;
+      group.add(bud);
+    } else if (stage === 3) {
+      // Full bloom
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.015, 0.02, 0.32, 4),
+        this.getMaterial(0x2d6a1e)
+      );
+      stem.position.y = 0.16;
+      group.add(stem);
+      // Leaves
+      for (const side of [-1, 1]) {
+        const leaf = new THREE.Mesh(
+          new THREE.SphereGeometry(0.035, 4, 3),
+          this.getMaterial(0x2d7a1e)
+        );
+        leaf.position.set(side * 0.05, 0.14, 0);
+        leaf.scale.set(1, 0.4, 0.6);
+        group.add(leaf);
+      }
+
+      if (cropType === 'sunflower') {
+        // Large yellow disc with brown center
+        const disc = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.1, 0.1, 0.02, 8),
+          this.getMaterial(color)
+        );
+        disc.position.y = 0.34;
+        disc.rotation.x = 0.3;
+        group.add(disc);
+        const center = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.05, 0.05, 0.025, 6),
+          this.getMaterial(0x5c3a1e)
+        );
+        center.position.y = 0.34;
+        center.rotation.x = 0.3;
+        group.add(center);
+      } else {
+        // Ancient_fruit: purple crystal-like shapes — small cones in star
+        for (let i = 0; i < 5; i++) {
+          const crystal = new THREE.Mesh(
+            new THREE.ConeGeometry(0.025, 0.08, 4),
+            this.getMaterial(color)
+          );
+          const angle = (i / 5) * Math.PI * 2;
+          crystal.position.set(
+            Math.cos(angle) * 0.03, 0.34, Math.sin(angle) * 0.03
+          );
+          crystal.rotation.z = Math.cos(angle) * 0.4;
+          crystal.rotation.x = Math.sin(angle) * 0.4;
+          group.add(crystal);
+        }
+        // Center crystal
+        const center = new THREE.Mesh(
+          new THREE.ConeGeometry(0.02, 0.1, 4),
+          this.getMaterial(color)
+        );
+        center.position.y = 0.36;
+        group.add(center);
+      }
+    }
+
+    group.castShadow = true;
+    return group;
+  }
+
+  // ── Gourd crops: melon, pumpkin, starfruit ──
+
+  _createGourdCrop(cropType, stage) {
+    const group = new THREE.Group();
+    const color = CROP_COLORS[cropType] || 0x90ee90;
+
+    if (stage === 0) { this._addSeedMound(group); }
+    else if (stage === 1) {
+      // Low vine shoot
+      const vine = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.01, 0.012, 0.1, 3),
+        this.getMaterial(0x44aa22)
+      );
+      vine.position.set(0, 0.02, 0);
+      vine.rotation.z = Math.PI / 3;
+      group.add(vine);
+      const leaf = new THREE.Mesh(
+        new THREE.SphereGeometry(0.025, 4, 3),
+        this.getMaterial(0x44aa22)
+      );
+      leaf.position.set(0.04, 0.05, 0);
+      leaf.scale.y = 0.4;
+      group.add(leaf);
+    } else if (stage === 2) {
+      // Spreading vine on ground with leaves
+      const vine = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.01, 0.012, 0.2, 3),
+        this.getMaterial(0x2d7a1e)
+      );
+      vine.position.y = 0.01;
+      vine.rotation.z = Math.PI / 2;
+      group.add(vine);
+      for (let i = 0; i < 3; i++) {
+        const leaf = new THREE.Mesh(
+          new THREE.SphereGeometry(0.04, 4, 3),
+          this.getMaterial(0x3d9930)
+        );
+        leaf.position.set((i - 1) * 0.07, 0.03, (i % 2) * 0.04 - 0.02);
+        leaf.scale.y = 0.4;
+        group.add(leaf);
+      }
+    } else if (stage === 3) {
+      // Vine + large distinctive fruit on ground
+      const vine = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.01, 0.012, 0.22, 3),
+        this.getMaterial(0x2d7a1e)
+      );
+      vine.position.y = 0.01;
+      vine.rotation.z = Math.PI / 2;
+      group.add(vine);
+      // Leaves
+      for (let i = 0; i < 3; i++) {
+        const leaf = new THREE.Mesh(
+          new THREE.SphereGeometry(0.035, 4, 3),
+          this.getMaterial(0x2d7a1e)
+        );
+        leaf.position.set(-0.06 + i * 0.06, 0.03, 0.06 - (i % 2) * 0.04);
+        leaf.scale.y = 0.4;
+        group.add(leaf);
+      }
+
+      if (cropType === 'pumpkin') {
+        // Orange sphere with slight ribbing via scale distortion
+        const fruit = new THREE.Mesh(
+          new THREE.SphereGeometry(0.1, 6, 5),
+          this.getMaterial(color)
+        );
+        fruit.position.y = 0.08;
+        fruit.scale.set(1.15, 0.85, 1.15);
+        group.add(fruit);
+        // Stem nub
+        const nub = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.015, 0.02, 0.04, 4),
+          this.getMaterial(0x4a6a1e)
+        );
+        nub.position.y = 0.16;
+        group.add(nub);
+      } else if (cropType === 'starfruit') {
+        // Yellow star shape — 5 flattened cones arranged radially
+        for (let i = 0; i < 5; i++) {
+          const point = new THREE.Mesh(
+            new THREE.ConeGeometry(0.025, 0.08, 4),
+            this.getMaterial(color)
+          );
+          const angle = (i / 5) * Math.PI * 2;
+          point.position.set(Math.cos(angle) * 0.04, 0.06, Math.sin(angle) * 0.04);
+          point.rotation.z = -Math.cos(angle) * Math.PI / 2;
+          point.rotation.x = -Math.sin(angle) * Math.PI / 2;
+          point.scale.y = 0.6;
+          group.add(point);
+        }
+        // Center sphere
+        const core = new THREE.Mesh(
+          new THREE.SphereGeometry(0.035, 5, 4),
+          this.getMaterial(color)
+        );
+        core.position.y = 0.06;
+        group.add(core);
+      } else {
+        // Melon — green sphere
+        const fruit = new THREE.Mesh(
+          new THREE.SphereGeometry(0.1, 6, 5),
+          this.getMaterial(color)
+        );
+        fruit.position.y = 0.08;
+        fruit.scale.y = 0.85;
+        group.add(fruit);
+      }
+    }
+
+    group.castShadow = true;
+    return group;
+  }
+
+  // ── Generic fallback for unrecognized crops ──
+
+  _createGenericCrop(cropType, stage) {
     const group = new THREE.Group();
     const scale = 0.2 + stage * 0.27;
-    const topColor = colors[cropType] || 0x44aa22;
+    const topColor = CROP_COLORS[cropType] || 0x44aa22;
 
-    // Stem
-    const stem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.02, 0.03, 0.5 * scale, 4),
-      this.getMaterial(0x2d5a1e)
-    );
-    stem.position.y = 0.25 * scale;
-    group.add(stem);
+    if (stage === 0) { this._addSeedMound(group); }
+    else {
+      // Stem
+      const stem = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.03, 0.5 * scale, 4),
+        this.getMaterial(0x2d5a1e)
+      );
+      stem.position.y = 0.25 * scale;
+      group.add(stem);
 
-    if (stage >= 1) {
       if (stage === 1) {
         const leaf = new THREE.Mesh(
           new THREE.SphereGeometry(0.08, 4, 3), this.getMaterial(0x44aa22)

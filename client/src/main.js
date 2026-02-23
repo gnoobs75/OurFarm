@@ -21,6 +21,7 @@ import { PlayerRenderer } from './entities/PlayerRenderer.js';
 import { NPCRenderer } from './entities/NPCRenderer.js';
 import { PetRenderer } from './entities/PetRenderer.js';
 import { AnimalRenderer } from './entities/AnimalRenderer.js';
+import { ResourceRenderer } from './entities/ResourceRenderer.js';
 import { HUD } from './ui/HUD.js';
 import { InventoryUI } from './ui/Inventory.js';
 import { DialogueUI } from './ui/DialogueUI.js';
@@ -52,6 +53,7 @@ async function main() {
   const buildings = new BuildingRenderer(sceneManager.scene, assets);
   const decorations = new DecorationRenderer(sceneManager.scene, assets);
   const grass = new GrassRenderer(sceneManager.scene);
+  const resources = new ResourceRenderer(sceneManager.scene, assets);
   const players = new PlayerRenderer(sceneManager.scene, assets);
   const npcs = new NPCRenderer(sceneManager.scene, assets);
   const pets = new PetRenderer(sceneManager.scene, assets);
@@ -208,6 +210,7 @@ async function main() {
     buildings.build(state.buildings);
     decorations.build(state.decorations || []);
     grass.build(state.tiles);
+    if (state.resources) resources.build(state.resources);
     sprinklers.build(state.sprinklers || []);
     machines.build(state.machines || []);
     forage.build(state.forageItems || []);
@@ -375,9 +378,22 @@ async function main() {
           }
           break;
         }
-        case 'pickaxe':
-          network.sendHarvest(tile.x, tile.z);
+        case 'axe': {
+          const res = resources.getResourceAtTile(tile.x, tile.z);
+          if (res && (res.type === 'tree' || res.isStump)) {
+            network.sendResourceHit(tile.x, tile.z);
+          }
           break;
+        }
+        case 'pickaxe': {
+          const res = resources.getResourceAtTile(tile.x, tile.z);
+          if (res && res.type === 'rock') {
+            network.sendResourceHit(tile.x, tile.z);
+          } else {
+            network.sendHarvest(tile.x, tile.z);
+          }
+          break;
+        }
         case 'sprinkler':
           network.sendPlaceSprinkler(activeItem.itemId, tile.x, tile.z);
           break;
@@ -393,6 +409,51 @@ async function main() {
       players.queueAction(network.playerId, action);
     });
 
+    // --- Hold-to-expand: 1x3 row action ---
+    input.on('tileActionExpanded', ({ tile, worldPos }) => {
+      if (dialogueUI.visible || selectionManager.hasContextMenu()) return;
+
+      const activeItem = hud.getActiveItem();
+      if (!activeItem) return;
+      const action = getToolAction(activeItem.itemId);
+      if (!action) return;
+
+      // Get player facing direction to determine the 1x3 row
+      const playerPos = players.getLocalPlayerPosition(network.playerId);
+      if (!playerPos) return;
+      const dx = worldPos.x - playerPos.x;
+      const dz = worldPos.z - playerPos.z;
+
+      // Determine primary axis
+      let rowDir;
+      if (Math.abs(dx) > Math.abs(dz)) {
+        rowDir = { x: Math.sign(dx), z: 0 };
+      } else {
+        rowDir = { x: 0, z: Math.sign(dz) };
+      }
+
+      const tiles = [
+        { x: tile.x, z: tile.z },
+        { x: tile.x + rowDir.x, z: tile.z + rowDir.z },
+        { x: tile.x + rowDir.x * 2, z: tile.z + rowDir.z * 2 },
+      ];
+
+      switch (action) {
+        case 'hoe':
+          network.sendMultiTill(tiles);
+          break;
+        case 'watering_can':
+          network.sendMultiWater(tiles);
+          break;
+        case 'seeds': {
+          const seedType = activeItem.itemId.replace('_seed', '');
+          network.sendMultiPlant(tiles, seedType);
+          break;
+        }
+      }
+      players.queueAction(network.playerId, action);
+    });
+
     // --- Keyboard shortcuts ---
     input.on('keyDown', ({ key }) => {
       // Cancel fishing on Escape
@@ -404,6 +465,9 @@ async function main() {
         return;
       }
 
+      if (key === 'r' || key === 'R') {
+        network.sendRestAtHouse();
+      }
       if (key === 'i' || key === 'I') inventoryUI.toggle();
       if (key === 'F3') debugWindow.toggle();
       if (key === 'c' || key === 'C') {
@@ -490,6 +554,23 @@ async function main() {
             showToast(data.message || 'Already groomed today', 'fail');
           }
           break;
+        case 'resourceHit':
+          resources.onResourceHit(data.resourceId);
+          break;
+        case 'resourceUpdate':
+          resources.onResourceUpdate(data.resource);
+          break;
+        case 'resourceRemoved':
+          resources.removeResource(data.resourceId);
+          break;
+        case 'tileChangeBatch':
+          for (const t of data.tiles) {
+            terrain.updateTile(t.x, t.z, t.tileType);
+          }
+          break;
+        case 'restComplete':
+          // Screen fade could be added later
+          break;
         case 'forageCollected':
           forage.removeForageItem(data.spawnId);
           break;
@@ -511,6 +592,8 @@ async function main() {
           machines.build(data.machines || []);
           forage.dispose();
           forage.build(data.forageItems || []);
+          resources.dispose();
+          resources.build(data.resources || []);
           break;
         case 'craftStarted':
           if (buildingsMap[data.buildingId]) {
@@ -550,6 +633,8 @@ async function main() {
           decorations.build(ms.decorations || []);
           grass.dispose();
           grass.build(ms.tiles);
+          resources.dispose();
+          resources.build(ms.resources || []);
           creatures.dispose();
           creatures = new AmbientCreatureRenderer(sceneManager.scene, ms.tiles);
           buildings.dispose();
@@ -610,6 +695,7 @@ async function main() {
       crops.update(delta);
       decorations.update(delta);
       grass.update(delta);
+      resources.update(delta);
       creatures.update(delta, sceneManager.cameraTarget);
       weather.update(delta, sceneManager.cameraTarget);
       players.update(delta);
@@ -633,6 +719,7 @@ async function main() {
         Crops: crops.cropMeshes ? crops.cropMeshes.size : 0,
         Pets: pets.petMeshes ? pets.petMeshes.size : 0,
         Animals: animals.animalMeshes ? animals.animalMeshes.size : 0,
+        Resources: resources._entries ? resources._entries.size : 0,
       });
     });
 
