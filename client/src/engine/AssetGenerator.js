@@ -515,14 +515,14 @@ export class AssetGenerator {
   // ═══════════════════════════════════════════════
 
   createAnimal(type) {
+    if (type === 'chicken') return this._createChicken();
+    if (type === 'cow') return this._createCow();
+    if (type === 'sheep') return this._createSheep();
+    if (type === 'goat') return this._createGoat();
+
+    // Generic fallback
     const group = new THREE.Group();
-    const configs = {
-      chicken: { bodyColor: 0xffffff, size: 0.2, legHeight: 0.1 },
-      cow:     { bodyColor: 0xf5f5f5, size: 0.5, legHeight: 0.3 },
-      sheep:   { bodyColor: 0xeeeeee, size: 0.4, legHeight: 0.25 },
-      goat:    { bodyColor: 0xccbbaa, size: 0.35, legHeight: 0.25 },
-    };
-    const cfg = configs[type] || configs.chicken;
+    const cfg = { bodyColor: 0xccbbaa, size: 0.3, legHeight: 0.2 };
     const bodyMat = this.getMaterial(cfg.bodyColor);
 
     const body = new THREE.Mesh(new THREE.SphereGeometry(cfg.size, 6, 4), bodyMat);
@@ -535,18 +535,382 @@ export class AssetGenerator {
     group.add(head);
 
     const legGeo = new THREE.CylinderGeometry(0.03, 0.03, cfg.legHeight, 4);
-    const legMat = this.getMaterial(type === 'chicken' ? 0xffaa00 : 0x555555);
-    const positions = type === 'chicken'
-      ? [[-0.05, 0.05], [0.05, 0.05]]
-      : [[-cfg.size * 0.5, cfg.size * 0.3], [cfg.size * 0.5, cfg.size * 0.3],
-         [-cfg.size * 0.5, -cfg.size * 0.3], [cfg.size * 0.5, -cfg.size * 0.3]];
-    for (const [lx, lz] of positions) {
+    const legMat = this.getMaterial(0x555555);
+    for (const [lx, lz] of [[-cfg.size * 0.5, cfg.size * 0.3], [cfg.size * 0.5, cfg.size * 0.3],
+         [-cfg.size * 0.5, -cfg.size * 0.3], [cfg.size * 0.5, -cfg.size * 0.3]]) {
       const leg = new THREE.Mesh(legGeo, legMat);
       leg.position.set(lx, cfg.legHeight / 2, lz);
       group.add(leg);
     }
 
     group.castShadow = true;
+    return group;
+  }
+
+  // ── Chicken ────────────────────────────────────
+  // Cute expressive chicken: plump body, red comb, orange beak, tiny wings
+
+  _createChicken() {
+    const group = new THREE.Group();
+
+    // Body — plump white sphere, slightly wider
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 5), this.getMaterial(0xffffff));
+    body.position.y = 0.3;
+    body.scale.set(1.2, 1, 1);
+    group.add(body);
+
+    // Head — smaller sphere on top-front
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 5), this.getMaterial(0xffffff));
+    head.position.set(0.22, 0.42, 0);
+    group.add(head);
+
+    // Comb — red box on top of head
+    const comb = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.03), this.getMaterial(0xcc2222));
+    comb.position.set(0.22, 0.55, 0);
+    group.add(comb);
+
+    // Beak — orange cone pointing forward
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.06, 4), this.getMaterial(0xffaa00));
+    beak.position.set(0.34, 0.40, 0);
+    beak.rotation.z = -Math.PI / 2;
+    group.add(beak);
+
+    // Eyes — two dark spheres on head front
+    const eyeMat = this.getMaterial(0x111111);
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.015, 4, 4), eyeMat);
+      eye.position.set(0.30, 0.44, side * 0.06);
+      group.add(eye);
+    }
+
+    // Wings — flattened spheres on body sides
+    const wingMat = this.getMaterial(0xeeeeee);
+    const wings = [];
+    for (const side of [-1, 1]) {
+      const wing = new THREE.Mesh(new THREE.SphereGeometry(0.06, 5, 4), wingMat);
+      wing.position.set(0.05, 0.32, side * 0.2);
+      wing.scale.set(1, 0.3, 0.6);
+      group.add(wing);
+      wings.push(wing);
+    }
+
+    // Tail fan — cone angled up behind body
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.08, 4), this.getMaterial(0xeeeecc));
+    tail.position.set(-0.2, 0.38, 0);
+    tail.rotation.z = Math.PI / 4;
+    group.add(tail);
+
+    // Legs — orange cylinders
+    const legMat = this.getMaterial(0xffaa00);
+    const legs = [];
+    for (const side of [-1, 1]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1, 4), legMat);
+      leg.position.set(0.05, 0.05, side * 0.07);
+      group.add(leg);
+      legs.push(leg);
+
+      // Feet — tiny orange boxes
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.01, 0.03), legMat);
+      foot.position.set(0.05, 0.0, side * 0.07);
+      group.add(foot);
+    }
+
+    group.userData.parts = { body, head, comb, beak, tail, legs, wings };
+    group.userData.animalType = 'chicken';
+    group.traverse(child => { if (child.isMesh) child.castShadow = true; });
+    return group;
+  }
+
+  // ── Cow ────────────────────────────────────────
+  // Cute expressive cow: spotted body, horns, udder, floppy ears
+
+  _createCow() {
+    const group = new THREE.Group();
+
+    // Body — large white sphere, elongated
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 7, 5), this.getMaterial(0xf5f5f5));
+    body.position.y = 0.8;
+    body.scale.z = 1.3;
+    group.add(body);
+
+    // Head — forward-up from body
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 6, 5), this.getMaterial(0xf5f5f5));
+    head.position.set(0.65, 1.05, 0);
+    group.add(head);
+
+    // Snout — pink box on front of head
+    const snout = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.1, 0.1), this.getMaterial(0xffccbb));
+    snout.position.set(0.88, 0.98, 0);
+    group.add(snout);
+
+    // Nostrils — 2 dark spheres on snout
+    const nostrilMat = this.getMaterial(0x333333);
+    for (const side of [-1, 1]) {
+      const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.015, 4, 4), nostrilMat);
+      nostril.position.set(0.96, 0.97, side * 0.025);
+      group.add(nostril);
+    }
+
+    // Eyes — white sclera + dark pupils, above snout
+    const scleraMat = this.getMaterial(0xffffff);
+    const pupilMat = this.getMaterial(0x222222);
+    for (const side of [-1, 1]) {
+      const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.04, 5, 4), scleraMat);
+      sclera.position.set(0.80, 1.12, side * 0.12);
+      group.add(sclera);
+
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.025, 4, 4), pupilMat);
+      pupil.position.set(0.84, 1.12, side * 0.12);
+      group.add(pupil);
+    }
+
+    // Horns — 2 cones angled outward
+    const hornMat = this.getMaterial(0xf5e6c8);
+    for (const side of [-1, 1]) {
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.12, 5), hornMat);
+      horn.position.set(0.55, 1.28, side * 0.15);
+      horn.rotation.z = side * -0.4;
+      group.add(horn);
+    }
+
+    // Ears — flattened spheres hanging from head sides (floppy)
+    const earMat = this.getMaterial(0xf5f5f5);
+    const ears = [];
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.06, 5, 4), earMat);
+      ear.position.set(0.55, 1.05, side * 0.28);
+      ear.scale.set(0.5, 0.3, 1);
+      group.add(ear);
+      ears.push(ear);
+    }
+
+    // Spots — 2-3 dark flattened spheres on body
+    const spotMat = this.getMaterial(0x444444);
+    const spotPositions = [
+      [0.1, 0.95, 0.4], [-0.15, 0.7, -0.35], [0.3, 0.65, 0.15],
+    ];
+    for (const [sx, sy, sz] of spotPositions) {
+      const spot = new THREE.Mesh(new THREE.SphereGeometry(0.1, 5, 4), spotMat);
+      spot.position.set(sx, sy, sz);
+      spot.scale.set(1, 0.15, 1);
+      group.add(spot);
+    }
+
+    // Udder — pink sphere under rear
+    const udder = new THREE.Mesh(new THREE.SphereGeometry(0.08, 5, 4), this.getMaterial(0xffbbaa));
+    udder.position.set(-0.2, 0.4, 0);
+    group.add(udder);
+
+    // Tail — thin cylinder + dark tuft
+    const tail = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.02, 0.25, 4), this.getMaterial(0xf5f5f5)
+    );
+    tail.position.set(-0.6, 0.85, 0);
+    tail.rotation.z = 0.5;
+    group.add(tail);
+
+    const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.03, 4, 4), spotMat);
+    tuft.position.set(-0.72, 0.75, 0);
+    group.add(tuft);
+
+    // Legs — 4 grey cylinders + dark hooves
+    const legMat = this.getMaterial(0x555555);
+    const hoofMat = this.getMaterial(0x333333);
+    const legs = [];
+    const legPositions = [
+      [0.25, 'fl'], [0.25, 'fr'], [-0.25, 'bl'], [-0.25, 'br'],
+    ];
+    const legSides = { fl: -0.2, fr: 0.2, bl: -0.2, br: 0.2 };
+    for (const [lx, label] of legPositions) {
+      const lz = legSides[label];
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.3, 4), legMat);
+      leg.position.set(lx, 0.15, lz);
+      group.add(leg);
+      legs.push(leg);
+
+      const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 4), hoofMat);
+      hoof.position.set(lx, 0.02, lz);
+      group.add(hoof);
+    }
+
+    group.userData.parts = {
+      body, head, snout, tail,
+      ears,
+      legs,
+    };
+    group.userData.animalType = 'cow';
+    group.traverse(child => { if (child.isMesh) child.castShadow = true; });
+    return group;
+  }
+
+  // ── Sheep ──────────────────────────────────────
+  // Cute expressive sheep: dodecahedron wool body, dark face
+
+  _createSheep() {
+    const group = new THREE.Group();
+
+    // Body — dodecahedron for fluffy wool look
+    const body = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(0.4, 1), this.getMaterial(0xf5f0e0)
+    );
+    body.position.y = 0.6;
+    group.add(body);
+
+    // Head — dark-faced sphere
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 5), this.getMaterial(0x4a3a2a));
+    head.position.set(0.45, 0.75, 0);
+    group.add(head);
+
+    // Eyes — white sclera + dark pupils
+    const scleraMat = this.getMaterial(0xffffff);
+    const pupilMat = this.getMaterial(0x111111);
+    for (const side of [-1, 1]) {
+      const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.03, 5, 4), scleraMat);
+      sclera.position.set(0.58, 0.80, side * 0.08);
+      group.add(sclera);
+
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.018, 4, 4), pupilMat);
+      pupil.position.set(0.61, 0.80, side * 0.08);
+      group.add(pupil);
+    }
+
+    // Nose — dark sphere
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.025, 4, 4), this.getMaterial(0x222222));
+    nose.position.set(0.62, 0.70, 0);
+    group.add(nose);
+
+    // Ears — dark cones angled outward/down
+    const earMat = this.getMaterial(0x4a3a2a);
+    const ears = [];
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.1, 4), earMat);
+      ear.position.set(0.38, 0.78, side * 0.18);
+      ear.rotation.z = side * 0.6;
+      ear.rotation.x = side * 0.3;
+      group.add(ear);
+      ears.push(ear);
+    }
+
+    // Stub tail — short cylinder
+    const tail = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.03, 0.03, 0.06, 4), this.getMaterial(0xf5f0e0)
+    );
+    tail.position.set(-0.4, 0.65, 0);
+    tail.rotation.z = 0.3;
+    group.add(tail);
+
+    // Legs — 4 dark cylinders + hooves
+    const legMat = this.getMaterial(0x4a3a2a);
+    const hoofMat = this.getMaterial(0x333333);
+    const legs = [];
+    for (const [lx, lz] of [[0.15, -0.15], [0.15, 0.15], [-0.15, -0.15], [-0.15, 0.15]]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.2, 4), legMat);
+      leg.position.set(lx, 0.1, lz);
+      group.add(leg);
+      legs.push(leg);
+
+      const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 4), hoofMat);
+      hoof.position.set(lx, 0.015, lz);
+      group.add(hoof);
+    }
+
+    group.userData.parts = { body, head, tail, ears, legs };
+    group.userData.animalType = 'sheep';
+    group.traverse(child => { if (child.isMesh) child.castShadow = true; });
+    return group;
+  }
+
+  // ── Goat ───────────────────────────────────────
+  // Cute expressive goat: beard, rectangular pupils, backward horns
+
+  _createGoat() {
+    const group = new THREE.Group();
+
+    // Body — tan sphere, elongated
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 5), this.getMaterial(0xccbbaa));
+    body.position.y = 0.6;
+    body.scale.z = 1.25;
+    group.add(body);
+
+    // Head — box geometry, lighter tan
+    const head = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 0.16, 0.16, 3, 3, 3), this.getMaterial(0xddccbb)
+    );
+    head.position.set(0.45, 0.78, 0);
+    group.add(head);
+
+    // Eyes — yellow sclera + dark rectangular pupils
+    const scleraMat = this.getMaterial(0xffffee);
+    const pupilMat = this.getMaterial(0x222222);
+    for (const side of [-1, 1]) {
+      const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.025, 5, 4), scleraMat);
+      sclera.position.set(0.54, 0.82, side * 0.055);
+      group.add(sclera);
+
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.015, 4, 4), pupilMat);
+      pupil.position.set(0.56, 0.82, side * 0.055);
+      pupil.scale.x = 1.5; // rectangular goat pupil
+      group.add(pupil);
+    }
+
+    // Nose — dark sphere
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.02, 4, 4), this.getMaterial(0x333333));
+    nose.position.set(0.55, 0.74, 0);
+    group.add(nose);
+
+    // Beard — cone below chin
+    const beard = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.08, 4), this.getMaterial(0xbbaa99));
+    beard.position.set(0.45, 0.62, 0);
+    group.add(beard);
+
+    // Horns — 2 cones tilted backward
+    const hornMat = this.getMaterial(0xf5e6c8);
+    const horns = [];
+    for (const side of [-1, 1]) {
+      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.1, 5), hornMat);
+      horn.position.set(0.38, 0.92, side * 0.06);
+      horn.rotation.z = 0.5; // tilted backward
+      group.add(horn);
+      horns.push(horn);
+    }
+
+    // Ears — cones pointing outward
+    const earMat = this.getMaterial(0xccbbaa);
+    const ears = [];
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.08, 4), earMat);
+      ear.position.set(0.40, 0.80, side * 0.14);
+      ear.rotation.z = side * 0.6;
+      group.add(ear);
+      ears.push(ear);
+    }
+
+    // Tail — thin short cylinder, angled up
+    const tail = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.02, 0.08, 4), this.getMaterial(0xbbaa99)
+    );
+    tail.position.set(-0.35, 0.7, 0);
+    tail.rotation.z = 0.6;
+    group.add(tail);
+
+    // Legs — 4 cylinders + dark hooves
+    const legMat = this.getMaterial(0x887766);
+    const hoofMat = this.getMaterial(0x333333);
+    const legs = [];
+    for (const [lx, lz] of [[0.12, -0.15], [0.12, 0.15], [-0.12, -0.15], [-0.12, 0.15]]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.25, 4), legMat);
+      leg.position.set(lx, 0.125, lz);
+      group.add(leg);
+      legs.push(leg);
+
+      const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 4), hoofMat);
+      hoof.position.set(lx, 0.015, lz);
+      group.add(hoof);
+    }
+
+    group.userData.parts = { body, head, beard, tail, horns, ears, legs };
+    group.userData.animalType = 'goat';
+    group.traverse(child => { if (child.isMesh) child.castShadow = true; });
     return group;
   }
 
@@ -797,6 +1161,7 @@ export class AssetGenerator {
       hairStyle = 'round',
       eyeStyle = 'dots',
       mouthStyle = 'smile',
+      accessory = null,
     } = params;
 
     // Body
@@ -916,16 +1281,130 @@ export class AssetGenerator {
     rightArmPivot.add(rightArm);
     group.add(rightArmPivot);
 
+    // Accessory
+    let accessoryMesh = null;
+    if (accessory) {
+      accessoryMesh = this._addNPCAccessory(group, accessory);
+    }
+
     // Store references for animation
     group.userData.parts = {
       body, head, hair,
       leftLegPivot, rightLegPivot,
       leftArmPivot, rightArmPivot,
+      accessory: accessoryMesh,
     };
 
     // Enable shadow casting on each child mesh (Group.castShadow doesn't propagate)
     group.traverse(child => { if (child.isMesh) child.castShadow = true; });
     return group;
+  }
+
+  // ── NPC Accessories ────────────────────────────
+
+  _addNPCAccessory(group, type) {
+    const accGroup = new THREE.Group();
+
+    switch (type) {
+      case 'chef_hat': {
+        const hat = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.12, 0.12, 0.15, 8), this.getMaterial(0xffffff)
+        );
+        hat.position.y = 1.48;
+        accGroup.add(hat);
+
+        const brim = new THREE.Mesh(
+          new THREE.TorusGeometry(0.14, 0.03, 6, 12), this.getMaterial(0xffffff)
+        );
+        brim.position.y = 1.4;
+        brim.rotation.x = Math.PI / 2;
+        accGroup.add(brim);
+        break;
+      }
+
+      case 'leather_apron': {
+        const apron = new THREE.Mesh(
+          new THREE.BoxGeometry(0.35, 0.4, 0.02), this.getMaterial(0x5c3a1a)
+        );
+        apron.position.set(0, 0.75, 0.14);
+        accGroup.add(apron);
+        break;
+      }
+
+      case 'glasses': {
+        const glassMat = this.getMaterial(0x666666);
+        for (const side of [-1, 1]) {
+          const lens = new THREE.Mesh(
+            new THREE.TorusGeometry(0.035, 0.005, 6, 12), glassMat
+          );
+          lens.position.set(side * 0.055, 1.22, 0.17);
+          lens.rotation.x = Math.PI / 2;
+          accGroup.add(lens);
+        }
+        // Bridge
+        const bridge = new THREE.Mesh(
+          new THREE.BoxGeometry(0.04, 0.005, 0.005), glassMat
+        );
+        bridge.position.set(0, 1.22, 0.17);
+        accGroup.add(bridge);
+        break;
+      }
+
+      case 'fishing_hat': {
+        const hatMat = this.getMaterial(0x6b7a3a);
+        const crown = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.16, 0.16, 0.04, 8), hatMat
+        );
+        crown.position.y = 1.38;
+        accGroup.add(crown);
+
+        const brim = new THREE.Mesh(
+          new THREE.TorusGeometry(0.2, 0.02, 6, 12), hatMat
+        );
+        brim.position.y = 1.36;
+        brim.rotation.x = Math.PI / 2;
+        accGroup.add(brim);
+
+        accGroup.rotation.x = -0.1;
+        break;
+      }
+
+      case 'top_hat': {
+        const hatMat = this.getMaterial(0x1a2a3a);
+        const crown = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.1, 0.1, 0.18, 8), hatMat
+        );
+        crown.position.y = 1.45;
+        accGroup.add(crown);
+
+        const brim = new THREE.Mesh(
+          new THREE.TorusGeometry(0.14, 0.02, 6, 12), hatMat
+        );
+        brim.position.y = 1.36;
+        brim.rotation.x = Math.PI / 2;
+        accGroup.add(brim);
+        break;
+      }
+
+      case 'stethoscope': {
+        const tube = new THREE.Mesh(
+          new THREE.TorusGeometry(0.12, 0.008, 6, 16), this.getMaterial(0x333333)
+        );
+        tube.position.y = 1.0;
+        tube.rotation.x = Math.PI / 2;
+        accGroup.add(tube);
+
+        const chest = new THREE.Mesh(
+          new THREE.SphereGeometry(0.02, 5, 4), this.getMaterial(0xaaaaaa)
+        );
+        chest.position.set(0, 0.92, 0.12);
+        accGroup.add(chest);
+        break;
+      }
+    }
+
+    group.add(accGroup);
+    return accGroup;
   }
 
   createPlayer(appearance = {}) {
