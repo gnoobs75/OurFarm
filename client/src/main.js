@@ -15,6 +15,7 @@ import { ForageRenderer } from './world/ForageRenderer.js';
 import { WeatherRenderer } from './world/WeatherRenderer.js';
 import { BuildingRenderer } from './world/BuildingRenderer.js';
 import { DecorationRenderer } from './world/DecorationRenderer.js';
+import { GrassRenderer } from './world/GrassRenderer.js';
 import { AmbientCreatureRenderer } from './world/AmbientCreatureRenderer.js';
 import { PlayerRenderer } from './entities/PlayerRenderer.js';
 import { NPCRenderer } from './entities/NPCRenderer.js';
@@ -50,6 +51,7 @@ async function main() {
   const weather = new WeatherRenderer(sceneManager.scene);
   const buildings = new BuildingRenderer(sceneManager.scene, assets);
   const decorations = new DecorationRenderer(sceneManager.scene, assets);
+  const grass = new GrassRenderer(sceneManager.scene);
   const players = new PlayerRenderer(sceneManager.scene, assets);
   const npcs = new NPCRenderer(sceneManager.scene, assets);
   const pets = new PetRenderer(sceneManager.scene, assets);
@@ -205,6 +207,7 @@ async function main() {
     animals.build(state.animals);
     buildings.build(state.buildings);
     decorations.build(state.decorations || []);
+    grass.build(state.tiles);
     sprinklers.build(state.sprinklers || []);
     machines.build(state.machines || []);
     forage.build(state.forageItems || []);
@@ -545,6 +548,8 @@ async function main() {
           water.build(ms.tiles);
           decorations.dispose();
           decorations.build(ms.decorations || []);
+          grass.dispose();
+          grass.build(ms.tiles);
           creatures.dispose();
           creatures = new AmbientCreatureRenderer(sceneManager.scene, ms.tiles);
           buildings.dispose();
@@ -604,6 +609,7 @@ async function main() {
       water.update(delta);
       crops.update(delta);
       decorations.update(delta);
+      grass.update(delta);
       creatures.update(delta, sceneManager.cameraTarget);
       weather.update(delta, sceneManager.cameraTarget);
       players.update(delta);
