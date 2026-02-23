@@ -57,19 +57,27 @@ export class AssetGenerator {
 
     // Trunk — tapered cylinder, warm brown
     const trunk = new THREE.Mesh(
-      new THREE.CylinderGeometry(trunkR * 0.7, trunkR, trunkH, 5),
+      new THREE.CylinderGeometry(trunkR * 0.7, trunkR, trunkH, 8),
       this.getMaterial(0x6b3a2a)
     );
     trunk.position.y = trunkH / 2;
     trunk.castShadow = true;
     group.add(trunk);
 
+    // Root flare — slightly wider ring at trunk base
+    const rootFlare = new THREE.Mesh(
+      new THREE.CylinderGeometry(trunkR, trunkR * 1.4, trunkH * 0.12, 8),
+      this.getMaterial(0x5a3020)
+    );
+    rootFlare.position.y = trunkH * 0.06;
+    group.add(rootFlare);
+
     if (variant % 3 === 1) {
       // ── Pine: 3 stacked dark cones ──
       const pineColors = [0x1a5c2a, 0x1e6b30, 0x227a38];
       for (let i = 0; i < 3; i++) {
         const cone = new THREE.Mesh(
-          new THREE.ConeGeometry(0.55 - i * 0.12, 0.5 + i * 0.05, 6),
+          new THREE.ConeGeometry(0.55 - i * 0.12, 0.5 + i * 0.05, 8),
           this.getMaterial(pineColors[i])
         );
         cone.position.y = trunkH + 0.1 + i * 0.3;
@@ -86,7 +94,7 @@ export class AssetGenerator {
         const cr = this._seededRand(seed + i, variant + i);
         const radius = 0.3 + cr * 0.2;
         const sphere = new THREE.Mesh(
-          new THREE.SphereGeometry(radius, 6, 5),
+          new THREE.SphereGeometry(radius, 8, 6),
           this.getMaterial(leafColor)
         );
         sphere.position.set(
@@ -144,7 +152,7 @@ export class AssetGenerator {
       c.b = Math.max(0, Math.min(1, c.b + colorVar));
 
       const rock = new THREE.Mesh(
-        new THREE.DodecahedronGeometry(scale, 0),
+        new THREE.DodecahedronGeometry(scale, 1),
         this.getMaterial(c.getHex())
       );
       rock.position.set(
@@ -433,7 +441,7 @@ export class AssetGenerator {
 
     // Roof — pyramid
     const roof = new THREE.Mesh(
-      new THREE.ConeGeometry(cfg.w * 0.85, cfg.h * 0.45, 4), this.getMaterial(cfg.roofColor)
+      new THREE.ConeGeometry(cfg.w * 0.85, cfg.h * 0.45, 6), this.getMaterial(cfg.roofColor)
     );
     roof.position.y = cfg.h + cfg.h * 0.225;
     roof.rotation.y = Math.PI / 4;
@@ -454,19 +462,60 @@ export class AssetGenerator {
     knob.position.set(0.12, 0.35, cfg.d / 2 + 0.02);
     group.add(knob);
 
+    // Foundation base — thin darker strip under walls
+    const foundationColor = new THREE.Color(cfg.color).multiplyScalar(0.6).getHex();
+    const foundation = new THREE.Mesh(
+      new THREE.BoxGeometry(cfg.w + 0.1, 0.08, cfg.d + 0.1), this.getMaterial(foundationColor)
+    );
+    foundation.position.y = 0.04;
+    foundation.receiveShadow = true;
+    group.add(foundation);
+
     // Windows — front + sides, soft glow
     const windowMat = this.getMaterial(0xaaddff, { emissive: 0x334455, emissiveIntensity: 0.3 });
+    const sillMat = this.getMaterial(0xdddddd);
     for (const side of [-1, 1]) {
       // Front windows flanking door
       const win = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.25), windowMat);
       win.position.set(side * cfg.w * 0.3, cfg.h * 0.6, cfg.d / 2 + 0.01);
       group.add(win);
 
+      // Window sill under front window
+      const sill = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.025, 0.06), sillMat);
+      sill.position.set(side * cfg.w * 0.3, cfg.h * 0.6 - 0.14, cfg.d / 2 + 0.03);
+      group.add(sill);
+
+      // Flower box under front window — small green box with tiny colored dots
+      const flowerBox = new THREE.Mesh(
+        new THREE.BoxGeometry(0.28, 0.04, 0.05), this.getMaterial(0x2d5a1e)
+      );
+      flowerBox.position.set(side * cfg.w * 0.3, cfg.h * 0.6 - 0.18, cfg.d / 2 + 0.04);
+      group.add(flowerBox);
+
+      // Tiny flower dots in the box
+      const flowerColors = [0xff4466, 0xffdd44, 0xff88cc];
+      for (let fi = 0; fi < 3; fi++) {
+        const dot = new THREE.Mesh(
+          new THREE.SphereGeometry(0.015, 4, 3), this.getMaterial(flowerColors[fi])
+        );
+        dot.position.set(
+          side * cfg.w * 0.3 + (fi - 1) * 0.08,
+          cfg.h * 0.6 - 0.15,
+          cfg.d / 2 + 0.06
+        );
+        group.add(dot);
+      }
+
       // Side windows
       const sideWin = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.25), windowMat);
       sideWin.position.set(side * (cfg.w / 2 + 0.01), cfg.h * 0.6, 0);
       sideWin.rotation.y = Math.PI / 2;
       group.add(sideWin);
+
+      // Window sill under side window
+      const sideSill = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.025, 0.34), sillMat);
+      sideSill.position.set(side * (cfg.w / 2 + 0.03), cfg.h * 0.6 - 0.14, 0);
+      group.add(sideSill);
     }
 
     // ── House extras: chimney + porch ──
@@ -554,13 +603,13 @@ export class AssetGenerator {
     const group = new THREE.Group();
 
     // Body — plump white sphere, slightly wider
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 5), this.getMaterial(0xffffff));
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), this.getMaterial(0xffffff));
     body.position.y = 0.3;
     body.scale.set(1.2, 1, 1);
     group.add(body);
 
     // Head — smaller sphere on top-front
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 5), this.getMaterial(0xffffff));
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), this.getMaterial(0xffffff));
     head.position.set(0.22, 0.42, 0);
     group.add(head);
 
@@ -628,13 +677,13 @@ export class AssetGenerator {
     const group = new THREE.Group();
 
     // Body — large white sphere, elongated
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 7, 5), this.getMaterial(0xf5f5f5));
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), this.getMaterial(0xf5f5f5));
     body.position.y = 0.8;
     body.scale.z = 1.3;
     group.add(body);
 
     // Head — forward-up from body
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 6, 5), this.getMaterial(0xf5f5f5));
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 6), this.getMaterial(0xf5f5f5));
     head.position.set(0.65, 1.05, 0);
     group.add(head);
 
@@ -757,7 +806,7 @@ export class AssetGenerator {
     group.add(body);
 
     // Head — dark-faced sphere
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 5), this.getMaterial(0x4a3a2a));
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), this.getMaterial(0x4a3a2a));
     head.position.set(0.45, 0.75, 0);
     group.add(head);
 
@@ -827,7 +876,7 @@ export class AssetGenerator {
     const group = new THREE.Group();
 
     // Body — tan sphere, elongated
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.35, 6, 5), this.getMaterial(0xccbbaa));
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), this.getMaterial(0xccbbaa));
     body.position.y = 0.6;
     body.scale.z = 1.25;
     group.add(body);
@@ -972,14 +1021,14 @@ export class AssetGenerator {
     const bodyMat = this.getMaterial(color);
 
     // Body — small elongated sphere
-    const body = new THREE.Mesh(new THREE.SphereGeometry(bodySize, 6, 4), bodyMat);
+    const body = new THREE.Mesh(new THREE.SphereGeometry(bodySize, 8, 6), bodyMat);
     body.position.y = bodySize + 0.06;
     body.scale.z = 1.2;
     group.add(body);
 
     // Head — oversized apple dome (0.7x body ratio)
     const headSize = bodySize * 0.7;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(headSize, 6, 5), bodyMat);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(headSize, 8, 6), bodyMat);
     head.position.set(0, bodySize + 0.06 + bodySize * 0.55, bodySize * 1.1);
     group.add(head);
 
@@ -1060,14 +1109,14 @@ export class AssetGenerator {
     const bodyMat = this.getMaterial(color);
 
     // Body — large elongated sphere
-    const body = new THREE.Mesh(new THREE.SphereGeometry(bodySize, 6, 4), bodyMat);
+    const body = new THREE.Mesh(new THREE.SphereGeometry(bodySize, 8, 6), bodyMat);
     body.position.y = bodySize + 0.18;
     body.scale.z = 1.4;
     group.add(body);
 
     // Head — proportional (0.5x body ratio)
     const headSize = bodySize * 0.5;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(headSize, 6, 5), bodyMat);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(headSize, 8, 6), bodyMat);
     head.position.set(0, bodySize + 0.18 + bodySize * 0.4, bodySize * 1.3);
     group.add(head);
 
@@ -1164,13 +1213,13 @@ export class AssetGenerator {
       accessory = null,
     } = params;
 
-    // Body
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.25), this.getMaterial(shirtColor));
+    // Body — extra segments for shoulder rounding
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, 0.25, 2, 2, 2), this.getMaterial(shirtColor));
     body.position.y = 0.75;
     group.add(body);
 
     // Head
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 6, 5), this.getMaterial(skinColor));
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), this.getMaterial(skinColor));
     head.position.y = 1.2;
     group.add(head);
 
@@ -1192,12 +1241,12 @@ export class AssetGenerator {
       hair.add(center);
       hair.position.y = 1.28;
     } else if (hairStyle === 'long') {
-      hair = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 5), hairMat);
+      hair = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), hairMat);
       hair.position.y = 1.25;
       hair.scale.set(1.05, 1.1, 1.15);
     } else {
       // 'round' — default
-      hair = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 5), hairMat);
+      hair = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), hairMat);
       hair.position.y = 1.28;
       hair.scale.set(1, 0.6, 1);
     }
@@ -1428,9 +1477,10 @@ export class AssetGenerator {
     group.add(pedestal);
 
     // Body — simple figure
+    const stoneMat = this.getMaterial(0xaaaaaa);
     const body = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.12, 0.15, 0.6, 6),
-      this.getMaterial(0xaaaaaa)
+      new THREE.CylinderGeometry(0.12, 0.15, 0.6, 8),
+      stoneMat
     );
     body.position.y = 0.7;
     body.castShadow = true;
@@ -1438,11 +1488,23 @@ export class AssetGenerator {
 
     // Head
     const head = new THREE.Mesh(
-      new THREE.SphereGeometry(0.1, 6, 5),
-      this.getMaterial(0xaaaaaa)
+      new THREE.SphereGeometry(0.1, 8, 6),
+      stoneMat
     );
     head.position.y = 1.1;
     group.add(head);
+
+    // Arms — two thin cylinders angled from body
+    for (const side of [-1, 1]) {
+      const arm = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.03, 0.035, 0.3, 6),
+        stoneMat
+      );
+      arm.position.set(side * 0.2, 0.8, 0);
+      arm.rotation.z = side * 0.8;
+      arm.castShadow = true;
+      group.add(arm);
+    }
 
     return group;
   }
@@ -1452,7 +1514,7 @@ export class AssetGenerator {
 
     // Base pool — wide short cylinder
     const pool = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.8, 0.9, 0.2, 8),
+      new THREE.CylinderGeometry(0.8, 0.9, 0.2, 12),
       this.getMaterial(0x888888)
     );
     pool.position.y = 0.1;
@@ -1461,7 +1523,7 @@ export class AssetGenerator {
 
     // Water surface
     const water = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.7, 0.7, 0.05, 8),
+      new THREE.CylinderGeometry(0.7, 0.7, 0.05, 12),
       this.getMaterial(0x4a90d9, { transparent: true, opacity: 0.7 })
     );
     water.position.y = 0.15;
@@ -1469,7 +1531,7 @@ export class AssetGenerator {
 
     // Central pillar
     const pillar = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.08, 0.12, 0.6, 6),
+      new THREE.CylinderGeometry(0.08, 0.12, 0.6, 8),
       this.getMaterial(0x999999)
     );
     pillar.position.y = 0.5;
@@ -1478,11 +1540,23 @@ export class AssetGenerator {
 
     // Top bowl
     const bowl = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.25, 0.15, 0.1, 6),
+      new THREE.CylinderGeometry(0.25, 0.15, 0.1, 8),
       this.getMaterial(0x999999)
     );
     bowl.position.y = 0.8;
     group.add(bowl);
+
+    // Water spray — small blue spheres above the top bowl
+    const sprayMat = this.getMaterial(0x6ab4f0, { transparent: true, opacity: 0.6 });
+    const sprayPositions = [
+      [0, 1.0, 0], [0.06, 0.95, 0.04], [-0.05, 0.93, -0.03],
+      [0.03, 0.97, -0.05], [-0.04, 0.98, 0.05],
+    ];
+    for (const [sx, sy, sz] of sprayPositions) {
+      const drop = new THREE.Mesh(new THREE.SphereGeometry(0.025, 5, 4), sprayMat);
+      drop.position.set(sx, sy, sz);
+      group.add(drop);
+    }
 
     return group;
   }
@@ -1506,6 +1580,14 @@ export class AssetGenerator {
     );
     lamp.position.y = 1.25;
     group.add(lamp);
+
+    // Soft glow sphere around the lamp
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 8, 6),
+      this.getMaterial(0xffee66, { emissive: 0xffcc44, emissiveIntensity: 0.8, transparent: true, opacity: 0.25 })
+    );
+    glow.position.y = 1.25;
+    group.add(glow);
 
     // Top cap
     const cap = new THREE.Mesh(
