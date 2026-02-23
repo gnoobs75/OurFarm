@@ -608,6 +608,10 @@ async function main() {
       weather.update(delta, sceneManager.cameraTarget);
       players.update(delta);
       fishingEffects.update(delta);
+      const localPos = players.getLocalPlayerPosition(state.playerId);
+      if (localPos) {
+        npcs.setPlayerPosition(localPos.x, localPos.z);
+      }
       npcs.update(delta);
       pets.update(delta);
       animals.update(delta);
