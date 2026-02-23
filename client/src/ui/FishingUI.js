@@ -4,7 +4,7 @@
 
 const TRACK_HEIGHT = 400;
 const TRACK_WIDTH = 48;
-const FILL_RATE = 0.008;
+const FILL_RATE = 0.0027;
 const STARTING_PROGRESS = 0.25;
 
 const RARITY_CONFIG = {
