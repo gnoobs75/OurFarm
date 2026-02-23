@@ -140,6 +140,51 @@ export class AssetGenerator {
     return group;
   }
 
+  createStump(variant = 0) {
+    const group = new THREE.Group();
+    const r = this._seededRand(variant, 77);
+
+    // Main stump body — short cylinder
+    const stump = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.15, 0.18, 0.1, 6),
+      this.getMaterial(0x8b6914)
+    );
+    stump.position.y = 0.05;
+    stump.castShadow = true;
+    group.add(stump);
+
+    // Ring detail on top — lighter color torus
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(0.08, 0.01, 4, 8),
+      this.getMaterial(0xa0824a)
+    );
+    ring.position.y = 0.1;
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+
+    // Optional roots: 2-3 small flattened cylinders at base, angled outward
+    const rootCount = 2 + Math.floor(r * 2);
+    for (let i = 0; i < rootCount; i++) {
+      const angle = (i / rootCount) * Math.PI * 2 + r;
+      const root = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.02, 0.03, 0.12, 4),
+        this.getMaterial(0x6b4a14)
+      );
+      root.position.set(
+        Math.cos(angle) * 0.15,
+        0.02,
+        Math.sin(angle) * 0.15
+      );
+      root.rotation.z = Math.cos(angle) * 0.8;
+      root.rotation.x = Math.sin(angle) * 0.8;
+      root.scale.y = 0.5; // flatten
+      group.add(root);
+    }
+
+    group.userData.type = 'stump';
+    return group;
+  }
+
   // ═══════════════════════════════════════════════
   //  ROCKS — cluster of 2-3 varied dodecahedrons
   // ═══════════════════════════════════════════════
