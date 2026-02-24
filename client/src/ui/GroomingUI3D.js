@@ -968,8 +968,25 @@ export class GroomingUI3D {
 
       if (this._animator) this._animator.setExpression('neutral');
 
-      // Show direction hint in the hint area
-      this._updateBrushHint();
+      // Create animated direction arrow overlay
+      const arrow = document.createElement('div');
+      arrow.className = 'groom-brush-arrow';
+      arrow.textContent = '\u27A1'; // right arrow
+      arrow.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 48px;
+        opacity: 0.6;
+        pointer-events: none;
+        transition: transform 0.3s ease, font-size 0.2s ease, color 0.2s ease;
+        z-index: 10;
+      `;
+      this._viewport.appendChild(arrow);
+
+      // Show initial stroke counter
+      this._hintEl.textContent = `0/${BRUSH_STROKES_NEEDED} strokes`;
 
       this._setupPointerListeners(
         // onMove
@@ -985,16 +1002,27 @@ export class GroomingUI3D {
 
           const dir = dx > 0 ? 'right' : 'left';
 
+          const hit = this._scene3D.raycastFromPointer(cx, cy);
+
           if (dir === this._brushDir) {
             this._brushCount++;
             this._brushStreak++;
             this._brushBestStreak = Math.max(this._brushBestStreak, this._brushStreak);
 
-            // Spawn sparkle trail at raycast point or cursor position
-            const hit = this._scene3D.raycastFromPointer(cx, cy);
+            // Spawn trail sparkle particles along the drag path
             if (hit && hit.point) {
-              this._spawnBurst(hit.point, 'sparkle', 2);
+              for (let i = 0; i < 4; i++) {
+                const offset = new THREE.Vector3(
+                  (Math.random() - 0.5) * 0.1,
+                  (Math.random() - 0.5) * 0.05,
+                  (Math.random() - 0.5) * 0.1,
+                );
+                this._spawnParticle(hit.point.clone().add(offset), 'sparkle');
+              }
             }
+
+            // Update stroke counter
+            this._hintEl.textContent = `${this._brushCount}/${BRUSH_STROKES_NEEDED} strokes`;
 
             // Happy expression + hearts at 3+ streak
             if (this._animator) {
@@ -1007,6 +1035,13 @@ export class GroomingUI3D {
             }
           } else {
             this._brushStreak = 0;
+            // Flash arrow red for wrong direction
+            arrow.style.color = 'red';
+            setTimeout(() => { arrow.style.color = ''; }, 200);
+            // Spawn gray poof at hit point
+            if (hit && hit.point) {
+              this._spawnBurst(hit.point, 'steam', 2);
+            }
             if (this._animator) {
               this._animator.setExpression('unhappy');
             }
@@ -1015,7 +1050,15 @@ export class GroomingUI3D {
           // Alternate direction every 3 strokes
           if (this._brushCount > 0 && this._brushCount % 3 === 0) {
             this._brushDir = this._brushDir === 'right' ? 'left' : 'right';
-            this._updateBrushHint();
+            // Update arrow direction
+            arrow.style.transform = this._brushDir === 'right'
+              ? 'translate(-50%, -50%)'
+              : 'translate(-50%, -50%) scaleX(-1)';
+            // Brief scale-up flash on direction change
+            arrow.style.fontSize = '64px';
+            setTimeout(() => { arrow.style.fontSize = '48px'; }, 200);
+            // Update stroke counter
+            this._hintEl.textContent = `${this._brushCount}/${BRUSH_STROKES_NEEDED} strokes`;
           }
 
           this._lastDragX = e.clientX;
@@ -1024,6 +1067,9 @@ export class GroomingUI3D {
           if (this._brushCount >= BRUSH_STROKES_NEEDED) {
             this._removePointerListeners();
             this._toolCursor.style.display = 'none';
+
+            // Remove arrow overlay
+            if (arrow.parentNode) arrow.parentNode.removeChild(arrow);
 
             // Bounce at phase end
             if (this._animator) {
@@ -1047,11 +1093,6 @@ export class GroomingUI3D {
         }
       );
     });
-  }
-
-  _updateBrushHint() {
-    const arrow = this._brushDir === 'right' ? '\u27A1\uFE0F' : '\u2B05\uFE0F';
-    this._hintEl.textContent = `Brush ${this._brushDir}! ${arrow}`;
   }
 
   // ─── Phase: Dress-Up ──────────────────────────────────────────
