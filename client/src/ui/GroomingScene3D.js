@@ -28,6 +28,9 @@ export class GroomingScene3D {
     this._overlayMeshes = [];
     this._glowMeshes = [];
 
+    // Camera lerp state (auto-rotate to zone)
+    this._cameraLerp = null;
+
     // --- Renderer ---
     this._renderer = new THREE.WebGLRenderer({
       canvas,
@@ -179,6 +182,37 @@ export class GroomingScene3D {
     this._renderer.setSize(width, height);
     this._camera.aspect = width / height;
     this._camera.updateProjectionMatrix();
+  }
+
+  // ─── Camera Lerp (auto-rotate to zone) ─────────────────────
+
+  /**
+   * Smoothly rotate the orbit camera to face a specific zone.
+   * @param {string} zoneName — zone to rotate toward
+   * @param {number} duration — lerp duration in seconds
+   */
+  lerpCameraToZone(zoneName, duration = 0.8) {
+    // Find the zone mesh by name
+    const zoneMesh = this._zoneMeshes.find(m => m.userData.zone === zoneName);
+    if (!zoneMesh) return;
+
+    // Calculate target camera position: orbit to face this zone
+    const zoneWorldPos = new THREE.Vector3();
+    zoneMesh.getWorldPosition(zoneWorldPos);
+
+    // Calculate the azimuthal angle from target to zone position
+    const target = this._controls.target;
+    const dx = zoneWorldPos.x - target.x;
+    const dz = zoneWorldPos.z - target.z;
+    const targetAzimuth = Math.atan2(dx, dz);
+
+    // Store lerp state
+    this._cameraLerp = {
+      startAzimuth: this._controls.getAzimuthalAngle(),
+      endAzimuth: targetAzimuth,
+      elapsed: 0,
+      duration,
+    };
   }
 
   // ─── Cleanup ───────────────────────────────────────────────

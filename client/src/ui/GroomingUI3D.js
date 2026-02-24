@@ -18,6 +18,16 @@ import { buildCosmeticMesh } from './GroomingDogBuilder.js';
 // ─── Zone names produced by GroomingDogBuilder ───────────────────
 const ZONE_NAMES = ['head', 'body-left', 'body-right', 'back', 'belly', 'legs'];
 
+// ─── Zone adjacency map (for auto-rotate to nearest incomplete) ──
+const ZONE_ADJACENT = {
+  'head': ['back', 'body-left', 'body-right'],
+  'body-left': ['head', 'back', 'belly', 'legs'],
+  'body-right': ['head', 'back', 'belly', 'legs'],
+  'back': ['head', 'body-left', 'body-right'],
+  'belly': ['body-left', 'body-right', 'legs'],
+  'legs': ['belly', 'body-left', 'body-right'],
+};
+
 // ─── Particle pool size ─────────────────────────────────────────
 const PARTICLE_POOL_SIZE = 50;
 
@@ -101,6 +111,9 @@ export class GroomingUI3D {
     this._brushBestStreak = 0;
     this._brushDir = 'right';
     this._lastDragX = null;
+
+    // Auto-rotate tracking (which zones have triggered camera rotation)
+    this._autoRotatedZones = new Set();
 
     // Pointer state
     this._isDragging = false;
@@ -308,6 +321,36 @@ export class GroomingUI3D {
             glow.material.opacity *= 0.9 + Math.sin(time * 4) * 0.1;
           }
         }
+      }
+
+      // Camera lerp (auto-rotate to zone)
+      if (scene3D._cameraLerp) {
+        const lerp = scene3D._cameraLerp;
+        lerp.elapsed += dt;
+        const t = Math.min(1, lerp.elapsed / lerp.duration);
+        const eased = t * t * (3 - 2 * t); // smoothstep
+
+        // Lerp azimuthal angle
+        const startA = lerp.startAzimuth;
+        const endA = lerp.endAzimuth;
+        // Handle wrapping: take shortest path
+        let diff = endA - startA;
+        if (diff > Math.PI) diff -= Math.PI * 2;
+        if (diff < -Math.PI) diff += Math.PI * 2;
+        const angle = startA + diff * eased;
+
+        // Apply to orbit controls by setting camera position on the orbit sphere
+        const camera = scene3D._camera;
+        const controls = scene3D._controls;
+        const radius = camera.position.distanceTo(controls.target);
+        const polar = controls.getPolarAngle();
+        camera.position.set(
+          controls.target.x + radius * Math.sin(polar) * Math.sin(angle),
+          controls.target.y + radius * Math.cos(polar),
+          controls.target.z + radius * Math.sin(polar) * Math.cos(angle),
+        );
+        camera.lookAt(controls.target);
+        if (t >= 1) scene3D._cameraLerp = null;
       }
 
       // Controls + render
@@ -523,6 +566,25 @@ export class GroomingUI3D {
   }
 
   /**
+   * Find the nearest incomplete zone to the given zone.
+   * Checks adjacent zones first, then all zones.
+   * @param {string} currentZone
+   * @returns {string|null}
+   */
+  _findNearestIncompleteZone(currentZone) {
+    const adjacent = ZONE_ADJACENT[currentZone] || ZONE_NAMES;
+    // First check adjacent zones
+    for (const z of adjacent) {
+      if (this._zoneProgress.get(z) < 1) return z;
+    }
+    // Then check all zones
+    for (const z of ZONE_NAMES) {
+      if (this._zoneProgress.get(z) < 1) return z;
+    }
+    return null;
+  }
+
+  /**
    * Increment a zone's progress when the pointer drags over it.
    * Clamps to [0, 1].
    * @param {string} zone
@@ -639,6 +701,7 @@ export class GroomingUI3D {
       this._toolCursor.style.display = 'block';
 
       this._zoneProgress = this._freshZoneProgress();
+      this._autoRotatedZones = new Set();
       this._phaseStartTime = Date.now();
       this._updateProgress(0);
       this._setOverlayPhase(0x8B6914); // brown dirt
@@ -656,6 +719,16 @@ export class GroomingUI3D {
             this._updateOverlayForZone(hit.zone);
             this._spawnBurst(hit.point, 'splash', 2);
             this._updateProgress(this._overallProgress());
+
+            // Auto-rotate to nearest incomplete zone when this one completes
+            const progress = this._zoneProgress.get(hit.zone);
+            if (progress >= 1.0 && !this._autoRotatedZones.has(hit.zone) && !this._allZonesComplete()) {
+              this._autoRotatedZones.add(hit.zone);
+              const incomplete = this._findNearestIncompleteZone(hit.zone);
+              if (incomplete) {
+                this._scene3D.lerpCameraToZone(incomplete);
+              }
+            }
 
             if (this._allZonesComplete()) {
               this._removePointerListeners();
@@ -684,6 +757,7 @@ export class GroomingUI3D {
       this._toolCursor.style.display = 'block';
 
       this._zoneProgress = this._freshZoneProgress();
+      this._autoRotatedZones = new Set();
       this._updateProgress(0);
       this._setOverlayPhase(0xffffff); // white foam remaining
       this._setGlowColor(0xffffff); // white
@@ -714,6 +788,16 @@ export class GroomingUI3D {
               this._animator.setExpression('happy');
             }
 
+            // Auto-rotate to nearest incomplete zone when this one completes
+            const progress = this._zoneProgress.get(hit.zone);
+            if (progress >= 1.0 && !this._autoRotatedZones.has(hit.zone) && !this._allZonesComplete()) {
+              this._autoRotatedZones.add(hit.zone);
+              const incomplete = this._findNearestIncompleteZone(hit.zone);
+              if (incomplete) {
+                this._scene3D.lerpCameraToZone(incomplete);
+              }
+            }
+
             if (this._allZonesComplete()) {
               this._removePointerListeners();
               this._toolCursor.style.display = 'none';
@@ -742,6 +826,7 @@ export class GroomingUI3D {
       this._toolCursor.style.display = 'block';
 
       this._zoneProgress = this._freshZoneProgress();
+      this._autoRotatedZones = new Set();
       this._phaseStartTime = Date.now();
       this._updateProgress(0);
       this._setOverlayPhase(0xaaddff); // soapy blue residue
@@ -759,6 +844,16 @@ export class GroomingUI3D {
             this._updateOverlayForZone(hit.zone);
             this._spawnBurst(hit.point, 'drip', 2);
             this._updateProgress(this._overallProgress());
+
+            // Auto-rotate to nearest incomplete zone when this one completes
+            const progress = this._zoneProgress.get(hit.zone);
+            if (progress >= 1.0 && !this._autoRotatedZones.has(hit.zone) && !this._allZonesComplete()) {
+              this._autoRotatedZones.add(hit.zone);
+              const incomplete = this._findNearestIncompleteZone(hit.zone);
+              if (incomplete) {
+                this._scene3D.lerpCameraToZone(incomplete);
+              }
+            }
 
             if (this._allZonesComplete()) {
               this._removePointerListeners();
@@ -787,6 +882,7 @@ export class GroomingUI3D {
       this._toolCursor.style.display = 'block';
 
       this._zoneProgress = this._freshZoneProgress();
+      this._autoRotatedZones = new Set();
       this._phaseStartTime = Date.now();
       this._updateProgress(0);
       this._setOverlayPhase(0x88bbdd); // water sheen
@@ -817,6 +913,18 @@ export class GroomingUI3D {
               const fluff = 1 + progress * 0.05; // +5% at full dry
               this._animator._parts.body.scale.x = fluff;
               this._animator._parts.body.scale.z = fluff;
+            }
+
+            // Auto-rotate to nearest incomplete zone when this one completes
+            {
+              const progress = this._zoneProgress.get(hit.zone);
+              if (progress >= 1.0 && !this._autoRotatedZones.has(hit.zone) && !this._allZonesComplete()) {
+                this._autoRotatedZones.add(hit.zone);
+                const incomplete = this._findNearestIncompleteZone(hit.zone);
+                if (incomplete) {
+                  this._scene3D.lerpCameraToZone(incomplete);
+                }
+              }
             }
 
             if (this._allZonesComplete()) {
