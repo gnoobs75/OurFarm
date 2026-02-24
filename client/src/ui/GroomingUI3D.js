@@ -177,7 +177,7 @@ export class GroomingUI3D {
         <div class="groom-3d-viewport">
           <canvas class="groom-3d-canvas"></canvas>
           <div class="groom-tool-cursor-3d"></div>
-          <div class="groom-orbit-hint">Right-drag to rotate &middot; Left-drag to groom</div>
+          <div class="groom-orbit-hint">Drag empty space to rotate &middot; Drag dog to groom</div>
         </div>
         <div class="groom-progress-area">
           <div class="groom-progress-track">
@@ -234,9 +234,9 @@ export class GroomingUI3D {
     this._animator = new GroomingDogAnimator(parts);
     this._lastClock = performance.now();
 
-    // Configure orbit controls: right-drag only
+    // Configure orbit controls: left-drag orbits on empty space, right-drag always orbits
     this._scene3D._controls.mouseButtons = {
-      LEFT: null,
+      LEFT: MOUSE.ROTATE,
       MIDDLE: null,
       RIGHT: MOUSE.ROTATE,
     };
@@ -416,18 +416,28 @@ export class GroomingUI3D {
     };
 
     this._boundPointerDown = (e) => {
-      // Only left button for grooming
-      if (e.button === 0) {
+      if (e.button !== 0) return; // Only left button
+      const rect = this._canvas.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const hit = this._scene3D.raycastFromPointer(cx, cy);
+      if (hit && hit.zone) {
+        // Grooming: disable orbit, start drag
+        this._scene3D._controls.enabled = false;
         this._isDragging = true;
         if (onDown) onDown(e);
+      } else {
+        // Orbiting: leave controls enabled, don't groom
+        this._isDragging = false;
       }
     };
 
     this._boundPointerUp = (e) => {
-      if (e.button === 0) {
-        this._isDragging = false;
-        if (onUp) onUp(e);
-      }
+      if (e.button !== 0) return;
+      this._scene3D._controls.enabled = true;
+      const wasGrooming = this._isDragging;
+      this._isDragging = false;
+      if (wasGrooming && onUp) onUp(e);
     };
 
     this._canvas.addEventListener('pointermove', this._boundPointerMove);
@@ -449,6 +459,11 @@ export class GroomingUI3D {
     this._boundPointerDown = null;
     this._boundPointerUp = null;
     this._isDragging = false;
+
+    // Re-enable orbit controls in case we were mid-groom-drag when listeners were removed
+    if (this._scene3D && this._scene3D._controls) {
+      this._scene3D._controls.enabled = true;
+    }
   }
 
   // ─── Zone Helpers ───────────────────────────────────────────
