@@ -13,10 +13,12 @@ const ENTITY_ACTIONS = {
 };
 
 export class SelectionManager {
-  constructor(scene, renderers, network) {
+  constructor(scene, renderers, network, options = {}) {
     this.scene = scene;
     this.renderers = renderers; // { npcs, animals, pets, machines, crops, forage }
     this.network = network;
+    this._cropsData = options.cropsData || {};
+    this._getTime = options.getTime || (() => null);
 
     // Hover ring
     this._hoverRing = this._createHoverRing();
@@ -113,15 +115,38 @@ export class SelectionManager {
       return { type: 'machine', id: machineId, name: data.type || 'Machine', detail };
     }
 
+    // Crops
+    const cropData = this.renderers.crops.getCropAtPosition(x, z);
+    if (cropData) {
+      const staticData = this._cropsData[cropData.cropType] || {};
+      return {
+        type: 'crop',
+        id: cropData.id,
+        name: staticData.name || cropData.cropType,
+        cropData,
+        staticData,
+      };
+    }
+
     return null;
   }
 
   _showTooltip(entity, screenPos) {
     if (!this._tooltip) return;
-    this._tooltip.innerHTML = `
-      <div class="tooltip-name">${entity.name}</div>
-      ${entity.detail ? `<div class="tooltip-detail">${entity.detail}</div>` : ''}
-    `;
+
+    let html;
+    if (entity.type === 'crop') {
+      html = this._buildCropTooltipHTML(entity);
+      this._tooltip.classList.add('tooltip-rich');
+    } else {
+      html = `
+        <div class="tooltip-name">${entity.name}</div>
+        ${entity.detail ? `<div class="tooltip-detail">${entity.detail}</div>` : ''}
+      `;
+      this._tooltip.classList.remove('tooltip-rich');
+    }
+
+    this._tooltip.innerHTML = html;
     this._tooltip.style.left = (screenPos.x + 16) + 'px';
     this._tooltip.style.top = (screenPos.y - 10) + 'px';
     this._tooltip.classList.remove('hidden');
@@ -211,6 +236,84 @@ export class SelectionManager {
         // Forage collect uses tile coords
         break;
     }
+  }
+
+  _buildCropTooltipHTML(entity) {
+    const { cropData, staticData } = entity;
+    const stage = cropData.stage;
+    const stageNames = ['Seed', 'Sprout', 'Mature', 'Harvestable'];
+    const stageName = stageNames[stage] || 'Unknown';
+
+    // Overall progress: stage contributes 0-3, growth within stage 0-1
+    const overallProgress = Math.min(1, (stage + cropData.growth) / 3);
+    const pctText = Math.round(overallProgress * 100);
+
+    // Status indicators
+    const watered = cropData.watered ? '\uD83D\uDCA7 Watered' : '\uD83C\uDF35 Needs water';
+    let fertLine = '';
+    if (cropData.fertilizer) {
+      const fertNames = {
+        fertilizer_basic: 'Basic Fertilizer',
+        fertilizer_quality: 'Quality Fertilizer',
+        speed_gro: 'Speed-Gro (+10%)',
+        deluxe_speed_gro: 'Deluxe Speed-Gro (+25%)',
+      };
+      fertLine = `<div class="tooltip-detail">\uD83E\uDDEA ${fertNames[cropData.fertilizer] || cropData.fertilizer}</div>`;
+    }
+
+    // Projected maturity
+    let maturityLine = '';
+    if (stage < 3 && staticData.growthTime) {
+      const time = this._getTime();
+      if (time) {
+        const remaining = this._estimateRemainingHours(cropData, staticData);
+        const daysLeft = Math.ceil(remaining / 24);
+        const projDay = (time.day || 1) + daysLeft;
+        const seasonNames = ['Spring', 'Summer', 'Fall', 'Winter'];
+        const season = seasonNames[time.season] || '';
+        maturityLine = `<div class="tooltip-detail">\uD83D\uDCC5 Matures: ~Day ${projDay} ${season}</div>`;
+      }
+    } else if (stage >= 3) {
+      maturityLine = `<div class="tooltip-detail" style="color:#7fda4f;">\u2705 Ready to harvest!</div>`;
+    }
+
+    // Season info
+    const seasonNames = ['Spring', 'Summer', 'Fall', 'Winter'];
+    const seasons = (staticData.season || []).map(s => seasonNames[s]).join(', ');
+
+    // Sell price and regrow info
+    const sellLine = staticData.sellPrice ? `Sells: ${staticData.sellPrice}g` : '';
+    const regrowLine = staticData.regrows ? ' \u00B7 Regrows' : '';
+
+    return `
+      <div class="tooltip-name">${entity.name}</div>
+      <div class="tooltip-detail">${stageName} (${stage + 1}/4)</div>
+      <div class="tooltip-progress">
+        <div class="tooltip-progress-bar" style="width:${pctText}%"></div>
+      </div>
+      <div class="tooltip-detail tooltip-pct">${pctText}% grown</div>
+      <div class="tooltip-divider"></div>
+      <div class="tooltip-detail">${watered}</div>
+      ${fertLine}
+      <div class="tooltip-divider"></div>
+      ${maturityLine}
+      <div class="tooltip-detail">\uD83C\uDF3F ${seasons}</div>
+      <div class="tooltip-detail">${sellLine}${regrowLine}</div>
+    `;
+  }
+
+  _estimateRemainingHours(cropData, staticData) {
+    const totalGrowthHours = staticData.growthTime * 24;
+    const progressPerHour = 3 / totalGrowthHours;
+    const rate = cropData.watered ? 1.5 : 1.0;
+    let speedMult = 1;
+    if (cropData.fertilizer) {
+      const FERT_SPEED = { speed_gro: 0.10, deluxe_speed_gro: 0.25 };
+      speedMult += FERT_SPEED[cropData.fertilizer] || 0;
+    }
+    const stagesLeft = (3 - cropData.stage) - cropData.growth;
+    const hoursLeft = stagesLeft / (progressPerHour * rate * speedMult);
+    return Math.max(0, hoursLeft);
   }
 
   dispose() {

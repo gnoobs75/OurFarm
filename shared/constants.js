@@ -35,6 +35,8 @@ export const CROP_STAGES = {
   HARVESTABLE: 3,
 };
 
+export const STAGE_NAMES = ['Seed', 'Sprout', 'Mature', 'Harvestable'];
+
 export const WEATHER = {
   SUNNY: 0,
   CLOUDY: 1,
