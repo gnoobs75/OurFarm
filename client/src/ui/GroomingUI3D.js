@@ -279,6 +279,25 @@ export class GroomingUI3D {
     // Prevent context menu on right-click in viewport
     this._boundContextMenu = (e) => e.preventDefault();
     this._canvas.addEventListener('contextmenu', this._boundContextMenu);
+
+    // Inject completion-feedback CSS keyframes (once)
+    if (!document.getElementById('groom-fx-styles')) {
+      const style = document.createElement('style');
+      style.id = 'groom-fx-styles';
+      style.textContent = `
+        @keyframes phaseFlash {
+          0% { box-shadow: inset 0 0 30px rgba(255, 215, 0, 0.6); }
+          100% { box-shadow: inset 0 0 0px rgba(255, 215, 0, 0); }
+        }
+        .star-pop { animation: starPop 0.4s ease-out; }
+        @keyframes starPop {
+          0% { transform: scale(0.3); }
+          60% { transform: scale(1.3); }
+          100% { transform: scale(1.0); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
   }
 
   _onResize() {
@@ -662,24 +681,42 @@ export class GroomingUI3D {
 
   _updateProgress(pct) {
     const p = Math.max(0, Math.min(1, pct));
+    this._progressFill.style.transition = 'width 0.15s ease-out';
     this._progressFill.style.width = (p * 100) + '%';
     this._progressLabel.textContent = Math.round(p * 100) + '%';
   }
 
   _showStars(count) {
     this._starsEl.forEach((el, i) => {
-      el.textContent = i < count ? '\u2605' : '\u2606';
-      el.classList.toggle('star-filled', i < count);
+      setTimeout(() => {
+        el.textContent = i < count ? '\u2605' : '\u2606';
+        el.classList.toggle('star-filled', i < count);
+        if (i < count) el.classList.add('star-pop');
+      }, i * 300);
     });
   }
 
   // ─── Phase Orchestration ────────────────────────────────────
 
+  _phaseTransitionFlash() {
+    return new Promise((resolve) => {
+      this._viewport.style.animation = 'none';
+      // Force reflow
+      void this._viewport.offsetWidth;
+      this._viewport.style.animation = 'phaseFlash 0.6s ease-out';
+      setTimeout(resolve, 600);
+    });
+  }
+
   async _runAllPhases() {
     const s1 = await this._washPhase();
+    await this._phaseTransitionFlash();
     const s2 = await this._soapPhase();
+    await this._phaseTransitionFlash();
     const s3 = await this._rinsePhase();
+    await this._phaseTransitionFlash();
     const s4 = await this._dryPhase();
+    await this._phaseTransitionFlash();
     const s5 = await this._brushPhase();
 
     this._totalScore = s1 + s2 + s3 + s4 + s5; // 0-15
@@ -723,6 +760,16 @@ export class GroomingUI3D {
             // Auto-rotate to nearest incomplete zone when this one completes
             const progress = this._zoneProgress.get(hit.zone);
             if (progress >= 1.0 && !this._autoRotatedZones.has(hit.zone) && !this._allZonesComplete()) {
+              // Zone completion burst!
+              const zoneMesh = this._scene3D._zoneMeshes.find(m => m.userData.zone === hit.zone);
+              if (zoneMesh) {
+                const center = new THREE.Vector3();
+                zoneMesh.getWorldPosition(center);
+                this._spawnBurst(center, 'splash', 10);
+                this._spawnBurst(center, 'sparkle', 5);
+              }
+              if (this._animator) this._animator.setExpression('bounce');
+
               this._autoRotatedZones.add(hit.zone);
               const incomplete = this._findNearestIncompleteZone(hit.zone);
               if (incomplete) {
@@ -791,6 +838,16 @@ export class GroomingUI3D {
             // Auto-rotate to nearest incomplete zone when this one completes
             const progress = this._zoneProgress.get(hit.zone);
             if (progress >= 1.0 && !this._autoRotatedZones.has(hit.zone) && !this._allZonesComplete()) {
+              // Zone completion burst!
+              const zoneMesh = this._scene3D._zoneMeshes.find(m => m.userData.zone === hit.zone);
+              if (zoneMesh) {
+                const center = new THREE.Vector3();
+                zoneMesh.getWorldPosition(center);
+                this._spawnBurst(center, 'foam', 10);
+                this._spawnBurst(center, 'sparkle', 5);
+              }
+              if (this._animator) this._animator.setExpression('bounce');
+
               this._autoRotatedZones.add(hit.zone);
               const incomplete = this._findNearestIncompleteZone(hit.zone);
               if (incomplete) {
@@ -848,6 +905,16 @@ export class GroomingUI3D {
             // Auto-rotate to nearest incomplete zone when this one completes
             const progress = this._zoneProgress.get(hit.zone);
             if (progress >= 1.0 && !this._autoRotatedZones.has(hit.zone) && !this._allZonesComplete()) {
+              // Zone completion burst!
+              const zoneMesh = this._scene3D._zoneMeshes.find(m => m.userData.zone === hit.zone);
+              if (zoneMesh) {
+                const center = new THREE.Vector3();
+                zoneMesh.getWorldPosition(center);
+                this._spawnBurst(center, 'drip', 10);
+                this._spawnBurst(center, 'sparkle', 5);
+              }
+              if (this._animator) this._animator.setExpression('bounce');
+
               this._autoRotatedZones.add(hit.zone);
               const incomplete = this._findNearestIncompleteZone(hit.zone);
               if (incomplete) {
@@ -919,6 +986,16 @@ export class GroomingUI3D {
             {
               const progress = this._zoneProgress.get(hit.zone);
               if (progress >= 1.0 && !this._autoRotatedZones.has(hit.zone) && !this._allZonesComplete()) {
+                // Zone completion burst!
+                const zoneMesh = this._scene3D._zoneMeshes.find(m => m.userData.zone === hit.zone);
+                if (zoneMesh) {
+                  const center = new THREE.Vector3();
+                  zoneMesh.getWorldPosition(center);
+                  this._spawnBurst(center, 'steam', 10);
+                  this._spawnBurst(center, 'sparkle', 5);
+                }
+                if (this._animator) this._animator.setExpression('bounce');
+
                 this._autoRotatedZones.add(hit.zone);
                 const incomplete = this._findNearestIncompleteZone(hit.zone);
                 if (incomplete) {
@@ -1262,6 +1339,14 @@ export class GroomingUI3D {
       if (this._animator) {
         this._animator.setExpression('happy');
         this._animator.setExpression('bounce');
+      }
+
+      // 3-star confetti burst
+      if (stars === 3) {
+        const center = new THREE.Vector3(0, 0.5, 0);
+        for (let i = 0; i < 20; i++) {
+          this._spawnParticle(center, Math.random() > 0.5 ? 'heart' : 'sparkle');
+        }
       }
 
       setTimeout(resolve, 1500);
