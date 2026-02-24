@@ -26,6 +26,7 @@ export class GroomingScene3D {
     this._dogGroup = null;
     this._zoneMeshes = [];
     this._overlayMeshes = [];
+    this._glowMeshes = [];
 
     // --- Renderer ---
     this._renderer = new THREE.WebGLRenderer({
@@ -93,7 +94,7 @@ export class GroomingScene3D {
   /**
    * Build and add the grooming dog model to the scene.
    * @param {object} petData — pet data from the server (breed, name, etc.)
-   * @returns {{ group: THREE.Group, parts: object, zones: THREE.Mesh[], overlays: THREE.Mesh[] }}
+   * @returns {{ group: THREE.Group, parts: object, zones: THREE.Mesh[], overlays: THREE.Mesh[], glowMeshes: THREE.Mesh[] }}
    */
   loadDog(petData) {
     // Remove any previously loaded dog
@@ -102,15 +103,17 @@ export class GroomingScene3D {
       this._dogGroup = null;
       this._zoneMeshes = [];
       this._overlayMeshes = [];
+      this._glowMeshes = [];
     }
 
-    const { group, parts, zones, overlays } = buildGroomingDog(petData);
+    const { group, parts, zones, overlays, glowMeshes } = buildGroomingDog(petData);
     this._dogGroup = group;
     this._zoneMeshes = zones;
     this._overlayMeshes = overlays;
+    this._glowMeshes = glowMeshes;
     this._scene.add(group);
 
-    return { group, parts, zones, overlays };
+    return { group, parts, zones, overlays, glowMeshes };
   }
 
   // ─── Render Loop ───────────────────────────────────────────
@@ -208,6 +211,7 @@ export class GroomingScene3D {
     this._dogGroup = null;
     this._zoneMeshes = [];
     this._overlayMeshes = [];
+    this._glowMeshes = [];
     this._scene = null;
     this._camera = null;
     this._renderer = null;

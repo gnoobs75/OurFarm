@@ -3,7 +3,7 @@
 // More detailed than the world-view AssetGenerator models since the
 // player sees this model up close in the grooming salon overlay.
 //
-// Exports buildGroomingDog(petData) -> { group, parts, zones, overlays }
+// Exports buildGroomingDog(petData) -> { group, parts, zones, overlays, glowMeshes }
 
 import * as THREE from 'three';
 
@@ -483,7 +483,47 @@ export function buildGroomingDog(petData) {
     new THREE.Vector3(0, cfg.legHeight * 0.5, 0),
   );
 
-  return { group, parts, zones, overlays };
+  // ─── Glow ring meshes (hover highlight indicators) ─────────
+  const glowMeshes = [];
+
+  function addGlow(name, position, outerRadius) {
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: 0x66ccff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const geo = new THREE.RingGeometry(outerRadius * 0.85, outerRadius, 24);
+    const mesh = new THREE.Mesh(geo, glowMat);
+    mesh.position.copy(position);
+    mesh.rotation.x = -Math.PI / 2; // lay flat
+    mesh.userData.glowZone = name;
+    mesh.renderOrder = 2;
+    group.add(mesh);
+    glowMeshes.push(mesh);
+    return mesh;
+  }
+
+  // Head glow
+  addGlow('head', head.position.clone(), hs * 1.5);
+
+  // Body-left glow
+  addGlow('body-left', new THREE.Vector3(-bs * 0.5, bodyY, 0), bs * 0.8);
+
+  // Body-right glow
+  addGlow('body-right', new THREE.Vector3(bs * 0.5, bodyY, 0), bs * 0.8);
+
+  // Back glow
+  addGlow('back', new THREE.Vector3(0, bodyY + bs * 0.7, 0), bs * 1.0);
+
+  // Belly glow
+  addGlow('belly', new THREE.Vector3(0, bodyY - bs * 0.7, 0), bs * 0.9);
+
+  // Legs glow
+  addGlow('legs', new THREE.Vector3(0, cfg.legHeight * 0.5, 0), bs * 1.1);
+
+  return { group, parts, zones, overlays, glowMeshes };
 }
 
 // ─── Cosmetic Mesh Builder ───────────────────────────────────────

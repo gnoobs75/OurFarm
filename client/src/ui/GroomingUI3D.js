@@ -83,6 +83,9 @@ export class GroomingUI3D {
     // Overlay meshes (dirty/phase indicators)
     this._overlayMeshes = [];
 
+    // Glow ring meshes (hover highlight indicators)
+    this._glowMeshes = [];
+
     // Particle pool
     this._particles = [];
     this._particleGroup = null;
@@ -230,9 +233,10 @@ export class GroomingUI3D {
     this._scene3D.resize(w, h);
 
     // Load the dog model
-    const { parts, overlays } = this._scene3D.loadDog(this._petData);
+    const { parts, overlays, glowMeshes } = this._scene3D.loadDog(this._petData);
     this._dogParts = parts;
     this._overlayMeshes = overlays || [];
+    this._glowMeshes = glowMeshes || [];
 
     // Create animator
     this._animator = new GroomingDogAnimator(parts);
@@ -295,6 +299,16 @@ export class GroomingUI3D {
 
       // Update particles
       this._updateParticles(dt);
+
+      // Pulse glow meshes
+      const time = now / 1000;
+      if (this._glowMeshes) {
+        for (const glow of this._glowMeshes) {
+          if (glow.material.opacity > 0.01) {
+            glow.material.opacity *= 0.9 + Math.sin(time * 4) * 0.1;
+          }
+        }
+      }
 
       // Controls + render
       scene3D._controls.update();
@@ -417,6 +431,16 @@ export class GroomingUI3D {
       this._toolCursor.style.top = cy + 'px';
 
       if (onMove) onMove(e, cx, cy);
+
+      // Zone glow highlight when not dragging
+      if (!this._isDragging && this._glowMeshes.length > 0) {
+        const hit = this._scene3D.raycastFromPointer(cx, cy);
+        for (const glow of this._glowMeshes) {
+          const isTarget = hit && hit.zone === glow.userData.glowZone;
+          const targetOpacity = isTarget ? 0.5 : 0;
+          glow.material.opacity += (targetOpacity - glow.material.opacity) * 0.15;
+        }
+      }
     };
 
     this._boundPointerDown = (e) => {
@@ -551,6 +575,16 @@ export class GroomingUI3D {
   }
 
   /**
+   * Set the glow ring color for all glow meshes.
+   * @param {number} hexColor — hex color value
+   */
+  _setGlowColor(hexColor) {
+    for (const glow of this._glowMeshes) {
+      glow.material.color.setHex(hexColor);
+    }
+  }
+
+  /**
    * Measure coverage evenness: standard deviation of zone progress values.
    * Lower = more even. Returns 0..1 where 0 is perfectly even.
    */
@@ -608,6 +642,7 @@ export class GroomingUI3D {
       this._phaseStartTime = Date.now();
       this._updateProgress(0);
       this._setOverlayPhase(0x8B6914); // brown dirt
+      this._setGlowColor(0x4488ff); // water blue
 
       if (this._animator) this._animator.setExpression('neutral');
 
@@ -651,6 +686,7 @@ export class GroomingUI3D {
       this._zoneProgress = this._freshZoneProgress();
       this._updateProgress(0);
       this._setOverlayPhase(0xffffff); // white foam remaining
+      this._setGlowColor(0xffffff); // white
 
       // Track peak unevenness throughout the phase for scoring.
       // Measured before zones clamp to 1.0 so it reflects real spread.
@@ -709,6 +745,7 @@ export class GroomingUI3D {
       this._phaseStartTime = Date.now();
       this._updateProgress(0);
       this._setOverlayPhase(0xaaddff); // soapy blue residue
+      this._setGlowColor(0x33aaff); // clear blue
 
       if (this._animator) this._animator.setExpression('neutral');
 
@@ -753,6 +790,7 @@ export class GroomingUI3D {
       this._phaseStartTime = Date.now();
       this._updateProgress(0);
       this._setOverlayPhase(0x88bbdd); // water sheen
+      this._setGlowColor(0xffcc44); // warm
 
       if (this._animator) this._animator.setExpression('happy');
 
@@ -818,6 +856,7 @@ export class GroomingUI3D {
       for (const overlay of this._overlayMeshes) {
         overlay.visible = false;
       }
+      this._setGlowColor(0xffd700); // gold
 
       if (this._animator) this._animator.setExpression('neutral');
 
