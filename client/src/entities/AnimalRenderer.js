@@ -1,4 +1,35 @@
 // client/src/entities/AnimalRenderer.js
+import * as THREE from 'three';
+
+// ─── Shared blob shadow geometry / material (reused across all animals) ───
+let _shadowGeo = null;
+let _shadowMat = null;
+
+const SHADOW_RADIUS = {
+  chicken: 0.15,
+  cow: 0.35,
+  sheep: 0.3,
+  goat: 0.25,
+  pig: 0.3,
+};
+
+function _createShadow(radius) {
+  if (!_shadowGeo) {
+    _shadowGeo = new THREE.CircleGeometry(1, 16); // unit circle, scaled per-instance
+    _shadowMat = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.25,
+      depthWrite: false,
+    });
+  }
+  const shadow = new THREE.Mesh(_shadowGeo, _shadowMat);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.scale.set(radius, radius, 1);
+  shadow.position.y = 0.02;
+  shadow.renderOrder = -1;
+  return shadow;
+}
 
 const IDLE_MAP = {
   chicken: ['peck', 'scratch', 'headBob'],
@@ -39,6 +70,11 @@ export class AnimalRenderer {
       // Preserve existing userData (e.g. userData.parts from animal models)
       mesh.userData.animalType = animal.type;
       mesh.userData.animalId = animal.id;
+
+      // Blob shadow — child of group so it follows XZ automatically
+      const shadowRadius = SHADOW_RADIUS[animal.type] || 0.25;
+      const shadow = _createShadow(shadowRadius);
+      mesh.add(shadow);
 
       this.scene.add(mesh);
 

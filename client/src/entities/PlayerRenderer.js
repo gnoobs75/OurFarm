@@ -1,5 +1,28 @@
 // client/src/entities/PlayerRenderer.js
+import * as THREE from 'three';
 import { tileToWorld } from '@shared/TileMap.js';
+
+// ─── Shared blob shadow geometry / material (reused across all players) ───
+let _shadowGeo = null;
+let _shadowMat = null;
+
+function _createShadow(radius) {
+  if (!_shadowGeo) {
+    _shadowGeo = new THREE.CircleGeometry(1, 16); // unit circle, scaled per-instance
+    _shadowMat = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.25,
+      depthWrite: false,
+    });
+  }
+  const shadow = new THREE.Mesh(_shadowGeo, _shadowMat);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.scale.set(radius, radius, 1);
+  shadow.position.y = 0.02;
+  shadow.renderOrder = -1;
+  return shadow;
+}
 
 // Animation durations (seconds)
 const ACTION_DURATION = 0.5;
@@ -21,6 +44,11 @@ export class PlayerRenderer {
     }
     const mesh = this.assetGen.createPlayer(appearance);
     mesh.position.set(playerState.x, 0, playerState.z);
+
+    // Blob shadow — child of group so it follows XZ automatically
+    const shadow = _createShadow(0.25);
+    mesh.add(shadow);
+
     this.scene.add(mesh);
 
     this.playerMeshes.set(playerState.id, {

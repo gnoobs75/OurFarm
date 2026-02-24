@@ -1,5 +1,28 @@
 // client/src/entities/NPCRenderer.js
 // NPC rendering with walking animation, idle breathing, head tracking, and personality gestures.
+import * as THREE from 'three';
+
+// ─── Shared blob shadow geometry / material (reused across all NPCs) ───
+let _shadowGeo = null;
+let _shadowMat = null;
+
+function _createShadow(radius) {
+  if (!_shadowGeo) {
+    _shadowGeo = new THREE.CircleGeometry(1, 16); // unit circle, scaled per-instance
+    _shadowMat = new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      transparent: true,
+      opacity: 0.25,
+      depthWrite: false,
+    });
+  }
+  const shadow = new THREE.Mesh(_shadowGeo, _shadowMat);
+  shadow.rotation.x = -Math.PI / 2;
+  shadow.scale.set(radius, radius, 1);
+  shadow.position.y = 0.02;
+  shadow.renderOrder = -1;
+  return shadow;
+}
 
 const NPC_WALK_SPEED = 6;
 const NPC_MOVE_LERP = 2;
@@ -35,6 +58,11 @@ export class NPCRenderer {
       mesh.position.set(npc.x, 0, npc.z);
       mesh.userData.npcId = npc.id;
       mesh.userData.name = npc.name;
+
+      // Blob shadow — child of group so it follows XZ automatically
+      const shadow = _createShadow(0.25);
+      mesh.add(shadow);
+
       this.scene.add(mesh);
       this.npcMeshes.set(npc.id, {
         mesh,

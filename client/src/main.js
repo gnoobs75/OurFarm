@@ -13,6 +13,7 @@ import { SprinklerRenderer } from './world/SprinklerRenderer.js';
 import { MachineRenderer } from './world/MachineRenderer.js';
 import { ForageRenderer } from './world/ForageRenderer.js';
 import { WeatherRenderer } from './world/WeatherRenderer.js';
+import { SeasonalEffects } from './world/SeasonalEffects.js';
 import { BuildingRenderer } from './world/BuildingRenderer.js';
 import { DecorationRenderer } from './world/DecorationRenderer.js';
 import { GrassRenderer } from './world/GrassRenderer.js';
@@ -35,6 +36,7 @@ import { tileToWorld } from '@shared/TileMap.js';
 import { TILE_TYPES } from '@shared/constants.js';
 import { debugClient } from './utils/DebugClient.js';
 import { FishingEffects } from './effects/FishingEffects.js';
+import { ActionEffects } from './world/ActionEffects.js';
 import { FishingUI } from './ui/FishingUI.js';
 import { GroomingUI3D as GroomingUI } from './ui/GroomingUI3D.js';
 
@@ -50,6 +52,7 @@ async function main() {
   const water = new WaterRenderer(sceneManager.scene);
   const crops = new CropRenderer(sceneManager.scene, assets);
   const weather = new WeatherRenderer(sceneManager.scene);
+  const seasonalEffects = new SeasonalEffects(sceneManager.scene);
   const buildings = new BuildingRenderer(sceneManager.scene, assets);
   const decorations = new DecorationRenderer(sceneManager.scene, assets);
   const grass = new GrassRenderer(sceneManager.scene);
@@ -61,6 +64,9 @@ async function main() {
   const sprinklers = new SprinklerRenderer(sceneManager.scene);
   const machines = new MachineRenderer(sceneManager.scene);
   let forage = new ForageRenderer(sceneManager.scene);
+
+  // --- Action particle effects ---
+  const actionEffects = new ActionEffects(sceneManager.scene);
 
   // --- Fishing ---
   const fishingEffects = new FishingEffects(sceneManager.scene);
@@ -248,6 +254,8 @@ async function main() {
     }
     hud.updateTime(state.time);
     if (state.time) sceneManager.setTimeOfDay(state.time.hour);
+    if (state.time) buildings.setTimeOfDay(state.time.hour);
+    if (state.time) seasonalEffects.setSeason(state.time.season);
     hud.updateWeather(state.weather.weather);
     hud.updateMap(state.mapId || 'farm');
 
@@ -359,13 +367,16 @@ async function main() {
       switch (action) {
         case 'hoe':
           network.sendTill(tile.x, tile.z);
+          actionEffects.spawnToolHit(tile.x + 0.5, tile.z + 0.5);
           break;
         case 'watering_can':
           network.sendWater(tile.x, tile.z);
+          actionEffects.spawnWatering(tile.x + 0.5, tile.z + 0.5);
           break;
         case 'seeds': {
           const seedType = activeItem.itemId.replace('_seed', '');
           network.sendPlant(tile.x, tile.z, seedType);
+          actionEffects.spawnPlanting(tile.x + 0.5, tile.z + 0.5);
           break;
         }
         case 'fishing_rod': {
@@ -383,6 +394,7 @@ async function main() {
           const res = resources.getResourceAtTile(tile.x, tile.z);
           if (res && (res.type === 'tree' || res.isStump)) {
             network.sendResourceHit(tile.x, tile.z);
+            actionEffects.spawnToolHit(tile.x + 0.5, tile.z + 0.5);
           }
           break;
         }
@@ -390,6 +402,7 @@ async function main() {
           const res = resources.getResourceAtTile(tile.x, tile.z);
           if (res && res.type === 'rock') {
             network.sendResourceHit(tile.x, tile.z);
+            actionEffects.spawnToolHit(tile.x + 0.5, tile.z + 0.5);
           } else {
             network.sendHarvest(tile.x, tile.z);
           }
@@ -512,6 +525,9 @@ async function main() {
           break;
         case 'cropHarvested':
           crops.removeCrop(data.cropId);
+          if (data.x !== undefined) {
+            actionEffects.spawnHarvest(data.x + 0.5, data.z + 0.5);
+          }
           break;
         case 'fishingBite':
           // Server rolled a fish — start the cinematic bite + mini-game sequence
@@ -640,6 +656,7 @@ async function main() {
           creatures = new AmbientCreatureRenderer(sceneManager.scene, ms.tiles);
           buildings.dispose();
           buildings.build(ms.buildings || []);
+          if (data.hour !== undefined) buildings.setTimeOfDay(data.hour);
           crops.dispose();
           crops.build(ms.crops || []);
           sprinklers.dispose();
@@ -654,6 +671,10 @@ async function main() {
           pets.build(ms.pets || []);
           animals.dispose();
           animals.build(ms.animals || []);
+
+          // Rebuild seasonal effects for new map
+          seasonalEffects.dispose();
+          if (data.season !== undefined) seasonalEffects.setSeason(data.season);
 
           // Rebuild buildings map for new map
           for (const key of Object.keys(buildingsMap)) delete buildingsMap[key];
@@ -675,6 +696,8 @@ async function main() {
     network.on('timeUpdate', (data) => {
       hud.updateTime(data);
       sceneManager.setTimeOfDay(data.hour);
+      buildings.setTimeOfDay(data.hour);
+      seasonalEffects.setSeason(data.season);
     });
     network.on('weatherUpdate', (data) => {
       hud.updateWeather(data.weather);
@@ -702,8 +725,10 @@ async function main() {
       resources.update(delta);
       creatures.update(delta, sceneManager.cameraTarget);
       weather.update(delta, sceneManager.cameraTarget);
+      seasonalEffects.update(delta, sceneManager.cameraTarget);
       players.update(delta);
       fishingEffects.update(delta);
+      actionEffects.update(delta);
       const localPos = players.getLocalPlayerPosition(state.playerId);
       if (localPos) {
         npcs.setPlayerPosition(localPos.x, localPos.z);
