@@ -80,6 +80,9 @@ export class GroomingUI3D {
     this._dogParts = null;
     this._equippedMeshes = { hat: null, neck: null, back: null };
 
+    // Overlay meshes (dirty/phase indicators)
+    this._overlayMeshes = [];
+
     // Particle pool
     this._particles = [];
     this._particleGroup = null;
@@ -227,8 +230,9 @@ export class GroomingUI3D {
     this._scene3D.resize(w, h);
 
     // Load the dog model
-    const { parts } = this._scene3D.loadDog(this._petData);
+    const { parts, overlays } = this._scene3D.loadDog(this._petData);
     this._dogParts = parts;
+    this._overlayMeshes = overlays || [];
 
     // Create animator
     this._animator = new GroomingDogAnimator(parts);
@@ -506,6 +510,46 @@ export class GroomingUI3D {
     this._zoneProgress.set(zone, Math.min(1, cur + amount));
   }
 
+  // ─── Overlay Helpers ──────────────────────────────────────────
+
+  /**
+   * Set overlay color and reset opacity for a new phase.
+   * @param {number} color — hex color for the phase overlay
+   */
+  _setOverlayPhase(color) {
+    for (const overlay of this._overlayMeshes) {
+      overlay.material.color.setHex(color);
+      overlay.material.opacity = 0.4;
+      overlay.visible = true;
+      // Also update splotch children
+      overlay.traverse((child) => {
+        if (child !== overlay && child.isMesh) {
+          child.material.color.setHex(color);
+          child.material.opacity = 0.4;
+        }
+      });
+    }
+  }
+
+  /**
+   * Fade an overlay mesh based on its zone's progress.
+   * @param {string} zoneName
+   */
+  _updateOverlayForZone(zoneName) {
+    const zoneProgress = this._zoneProgress.get(zoneName);
+    const overlay = this._overlayMeshes.find(m => m.userData.overlayZone === zoneName);
+    if (overlay) {
+      const newOpacity = 0.4 * (1 - zoneProgress);
+      overlay.material.opacity = newOpacity;
+      // Also fade splotch children
+      overlay.traverse((child) => {
+        if (child !== overlay && child.isMesh) {
+          child.material.opacity = newOpacity;
+        }
+      });
+    }
+  }
+
   /**
    * Measure coverage evenness: standard deviation of zone progress values.
    * Lower = more even. Returns 0..1 where 0 is perfectly even.
@@ -563,6 +607,7 @@ export class GroomingUI3D {
       this._zoneProgress = this._freshZoneProgress();
       this._phaseStartTime = Date.now();
       this._updateProgress(0);
+      this._setOverlayPhase(0x8B6914); // brown dirt
 
       if (this._animator) this._animator.setExpression('neutral');
 
@@ -573,6 +618,7 @@ export class GroomingUI3D {
           const hit = this._scene3D.raycastFromPointer(cx, cy);
           if (hit && hit.zone) {
             this._incrementZone(hit.zone);
+            this._updateOverlayForZone(hit.zone);
             this._spawnBurst(hit.point, 'splash', 2);
             this._updateProgress(this._overallProgress());
 
@@ -604,6 +650,7 @@ export class GroomingUI3D {
 
       this._zoneProgress = this._freshZoneProgress();
       this._updateProgress(0);
+      this._setOverlayPhase(0xffffff); // white foam remaining
 
       // Track peak unevenness throughout the phase for scoring.
       // Measured before zones clamp to 1.0 so it reflects real spread.
@@ -618,6 +665,7 @@ export class GroomingUI3D {
           const hit = this._scene3D.raycastFromPointer(cx, cy);
           if (hit && hit.zone) {
             this._incrementZone(hit.zone);
+            this._updateOverlayForZone(hit.zone);
             this._spawnBurst(hit.point, 'foam', 2);
             this._updateProgress(this._overallProgress());
 
@@ -660,6 +708,7 @@ export class GroomingUI3D {
       this._zoneProgress = this._freshZoneProgress();
       this._phaseStartTime = Date.now();
       this._updateProgress(0);
+      this._setOverlayPhase(0xaaddff); // soapy blue residue
 
       if (this._animator) this._animator.setExpression('neutral');
 
@@ -670,6 +719,7 @@ export class GroomingUI3D {
           const hit = this._scene3D.raycastFromPointer(cx, cy);
           if (hit && hit.zone) {
             this._incrementZone(hit.zone);
+            this._updateOverlayForZone(hit.zone);
             this._spawnBurst(hit.point, 'drip', 2);
             this._updateProgress(this._overallProgress());
 
@@ -702,6 +752,7 @@ export class GroomingUI3D {
       this._zoneProgress = this._freshZoneProgress();
       this._phaseStartTime = Date.now();
       this._updateProgress(0);
+      this._setOverlayPhase(0x88bbdd); // water sheen
 
       if (this._animator) this._animator.setExpression('happy');
 
@@ -712,6 +763,7 @@ export class GroomingUI3D {
           const hit = this._scene3D.raycastFromPointer(cx, cy);
           if (hit && hit.zone) {
             this._incrementZone(hit.zone);
+            this._updateOverlayForZone(hit.zone);
 
             // Mix of steam and sparkle particles
             this._spawnParticle(hit.point, 'steam');
@@ -761,6 +813,11 @@ export class GroomingUI3D {
       this._brushDir = 'right';
       this._lastDragX = null;
       this._updateProgress(0);
+
+      // Hide overlays during brush phase (no zone-based cleaning)
+      for (const overlay of this._overlayMeshes) {
+        overlay.visible = false;
+      }
 
       if (this._animator) this._animator.setExpression('neutral');
 

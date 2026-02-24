@@ -3,7 +3,7 @@
 // More detailed than the world-view AssetGenerator models since the
 // player sees this model up close in the grooming salon overlay.
 //
-// Exports buildGroomingDog(petData) -> { group, parts, zones }
+// Exports buildGroomingDog(petData) -> { group, parts, zones, overlays }
 
 import * as THREE from 'three';
 
@@ -402,7 +402,88 @@ export function buildGroomingDog(petData) {
     new THREE.Vector3(0, cfg.legHeight * 0.5, 0),
   );
 
-  return { group, parts, zones };
+  // ─── Overlay meshes (visible dirty/phase indicators) ──────────
+  const overlays = [];
+
+  function addOverlay(name, geometry, position, scale) {
+    const overlayMat = new THREE.MeshStandardMaterial({
+      color: 0x8B6914,  // dirty brown
+      transparent: true,
+      opacity: 0.4,
+      depthWrite: false,
+      roughness: 1.0,
+    });
+    const mesh = new THREE.Mesh(geometry, overlayMat);
+    mesh.position.copy(position);
+    if (scale) mesh.scale.copy(scale);
+    // Slightly smaller than zone mesh to avoid z-fighting
+    mesh.scale.multiplyScalar(0.98);
+    mesh.userData.overlayZone = name;
+    mesh.renderOrder = 1;
+    group.add(mesh);
+    addSplotches(mesh, overlayMat);
+    overlays.push(mesh);
+    return mesh;
+  }
+
+  function addSplotches(parentMesh, overlayMat) {
+    const splotchCount = 3 + Math.floor(Math.random() * 3); // 3-5
+    const parentRadius = parentMesh.geometry.parameters?.radius || 0.1;
+    for (let i = 0; i < splotchCount; i++) {
+      const r = parentRadius * (0.15 + Math.random() * 0.2);
+      const splotch = new THREE.Mesh(sphere(r, 5, 4), overlayMat);
+      splotch.position.set(
+        (Math.random() - 0.5) * parentRadius * 0.8,
+        (Math.random() - 0.5) * parentRadius * 0.6,
+        (Math.random() - 0.5) * parentRadius * 0.8,
+      );
+      parentMesh.add(splotch);
+    }
+  }
+
+  // Head overlay
+  addOverlay(
+    'head',
+    sphere(hs * 1.5, 8, 6),
+    head.position.clone(),
+  );
+
+  // Body-left overlay
+  addOverlay(
+    'body-left',
+    box(bodyZoneW, bodyZoneH, bodyZoneD),
+    new THREE.Vector3(-bs * 0.5, bodyY, 0),
+  );
+
+  // Body-right overlay
+  addOverlay(
+    'body-right',
+    box(bodyZoneW, bodyZoneH, bodyZoneD),
+    new THREE.Vector3(bs * 0.5, bodyY, 0),
+  );
+
+  // Back overlay
+  addOverlay(
+    'back',
+    box(bs * 2.0, bs * 0.6, bodyZoneD),
+    new THREE.Vector3(0, bodyY + bs * 0.7, 0),
+  );
+
+  // Belly overlay
+  addOverlay(
+    'belly',
+    box(bs * 1.8, bs * 0.6, bodyZoneD),
+    new THREE.Vector3(0, bodyY - bs * 0.7, 0),
+  );
+
+  // Legs overlay
+  addOverlay(
+    'legs',
+    box(bs * 2.2, cfg.legHeight * 1.8, bs * cfg.bodyScaleZ * 1.6),
+    new THREE.Vector3(0, cfg.legHeight * 0.5, 0),
+  );
+
+  return { group, parts, zones, overlays };
 }
 
 // ─── Cosmetic Mesh Builder ───────────────────────────────────────
