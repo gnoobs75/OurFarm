@@ -64,8 +64,8 @@ export class SceneManager {
 
   _setupLighting() {
     // Ambient — warm soft fill
-    const ambient = new THREE.AmbientLight(0xfff8ee, 0.55);
-    this.scene.add(ambient);
+    this.ambientLight = new THREE.AmbientLight(0xfff8ee, 0.55);
+    this.scene.add(this.ambientLight);
 
     // Sun — warm golden-hour, lower angle for longer shadows
     this.sunLight = new THREE.DirectionalLight(0xffe0a0, 1.1);
@@ -81,8 +81,109 @@ export class SceneManager {
     this.scene.add(this.sunLight);
 
     // Hemisphere — warm sky to earthy ground
-    const hemi = new THREE.HemisphereLight(0x88ccee, 0x4a7a2a, 0.35);
-    this.scene.add(hemi);
+    this.hemiLight = new THREE.HemisphereLight(0x88ccee, 0x4a7a2a, 0.35);
+    this.scene.add(this.hemiLight);
+  }
+
+  /**
+   * Update all lighting to match the given game hour (0-24 float).
+   * Uses keyframe interpolation for smooth transitions between time periods.
+   */
+  setTimeOfDay(hour) {
+    // Wrap hour into [0, 24)
+    hour = ((hour % 24) + 24) % 24;
+
+    // Keyframes: [hour, sunColor, sunIntensity, ambientColor, ambientIntensity, skyColor, hemiGround]
+    // Each keyframe defines the exact lighting state at that hour.
+    // We interpolate linearly between adjacent keyframes.
+    const keyframes = [
+      //  hr   sunColor    sunI  ambientColor ambI  skyColor    hemiGround
+      [  0,   0x1a1a3a,   0.10, 0x0a0a2a,    0.15, 0x0a0a1a,  0x0a0a1a  ],
+      [  5,   0x1a1a3a,   0.10, 0x0a0a2a,    0.15, 0x0a0a1a,  0x0a0a1a  ],
+      [  5.5, 0xffaa55,   0.40, 0x443355,    0.25, 0x443355,  0x1a2a1a  ],
+      [  7,   0xffcc77,   0.80, 0xffd8aa,    0.45, 0xffbb88,  0x3a5a2a  ],
+      [ 10,   0xffe8c0,   1.10, 0xfff8ee,    0.55, 0x87ceeb,  0x4a7a2a  ],
+      [ 16,   0xfff0d0,   1.10, 0xfff8ee,    0.55, 0x87ceeb,  0x4a7a2a  ],
+      [ 19,   0xff7733,   0.50, 0xff9955,    0.30, 0xff6633,  0x2a3a1a  ],
+      [ 21,   0x2a2a5a,   0.15, 0x1a1a3a,    0.20, 0x1a1a3a,  0x0a0a1a  ],
+      [ 24,   0x1a1a3a,   0.10, 0x0a0a2a,    0.15, 0x0a0a1a,  0x0a0a1a  ],
+    ];
+
+    // Find the two keyframes we're between
+    let kA = keyframes[0];
+    let kB = keyframes[keyframes.length - 1];
+    for (let i = 0; i < keyframes.length - 1; i++) {
+      if (hour >= keyframes[i][0] && hour <= keyframes[i + 1][0]) {
+        kA = keyframes[i];
+        kB = keyframes[i + 1];
+        break;
+      }
+    }
+
+    // Interpolation factor
+    const range = kB[0] - kA[0];
+    const t = range > 0 ? (hour - kA[0]) / range : 0;
+
+    // Reusable Color objects
+    const cA = this._todColorA || (this._todColorA = new THREE.Color());
+    const cB = this._todColorB || (this._todColorB = new THREE.Color());
+    const cOut = this._todColorOut || (this._todColorOut = new THREE.Color());
+
+    // Helper: lerp between two hex colors
+    const lerpHex = (hexA, hexB, f) => {
+      cA.set(hexA);
+      cB.set(hexB);
+      cOut.copy(cA).lerp(cB, f);
+      return cOut;
+    };
+
+    // Sun light
+    this.sunLight.color.copy(lerpHex(kA[1], kB[1], t));
+    this.sunLight.intensity = kA[2] + (kB[2] - kA[2]) * t;
+
+    // Ambient light
+    this.ambientLight.color.copy(lerpHex(kA[3], kB[3], t));
+    this.ambientLight.intensity = kA[4] + (kB[4] - kA[4]) * t;
+
+    // Sky / fog color
+    const skyColor = lerpHex(kA[5], kB[5], t);
+    this.scene.fog.color.copy(skyColor);
+    this.renderer.setClearColor(skyColor);
+
+    // Hemisphere light — sky color matches sky, ground from keyframes
+    this.hemiLight.color.copy(skyColor);
+    this.hemiLight.groundColor.copy(lerpHex(kA[6], kB[6], t));
+
+    // Sun position — arc across the sky based on hour
+    // Dawn (5) = east, Noon (12) = overhead, Dusk (21) = west
+    // Map hour to an angle: 5h=0deg(east), 13h=90deg(overhead), 21h=180deg(west)
+    // Night hours: sun goes below horizon
+    const dayStart = 5;
+    const dayEnd = 21;
+    const dayLength = dayEnd - dayStart;
+
+    let sunAngle; // 0=horizon east, PI/2=overhead, PI=horizon west
+    let sunHeight;
+
+    if (hour >= dayStart && hour <= dayEnd) {
+      // Daytime arc
+      sunAngle = ((hour - dayStart) / dayLength) * Math.PI;
+      sunHeight = Math.sin(sunAngle) * 30 + 2;
+    } else {
+      // Night — sun below horizon
+      sunHeight = -5;
+      sunAngle = hour < dayStart ? Math.PI + 0.5 : Math.PI + 0.5;
+    }
+
+    const sunX = Math.cos(sunAngle) * 25;
+    const sunZ = 15; // Keep sun offset on z-axis for shadow direction
+    this.sunLight.position.set(sunX, Math.max(sunHeight, 2), sunZ);
+
+    // Update the shadow camera to follow camera target for consistent shadows
+    if (this.cameraTarget) {
+      this.sunLight.target.position.copy(this.cameraTarget);
+      this.sunLight.target.updateMatrixWorld();
+    }
   }
 
   /** Move camera to follow a world position */

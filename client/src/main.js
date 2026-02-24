@@ -247,6 +247,7 @@ async function main() {
       inventoryUI.update(localPlayer.inventory);
     }
     hud.updateTime(state.time);
+    if (state.time) sceneManager.setTimeOfDay(state.time.hour);
     hud.updateWeather(state.weather.weather);
     hud.updateMap(state.mapId || 'farm');
 
@@ -671,7 +672,10 @@ async function main() {
       }
     });
 
-    network.on('timeUpdate', (data) => hud.updateTime(data));
+    network.on('timeUpdate', (data) => {
+      hud.updateTime(data);
+      sceneManager.setTimeOfDay(data.hour);
+    });
     network.on('weatherUpdate', (data) => {
       hud.updateWeather(data.weather);
       weather.setWeather(data.weather);
@@ -707,6 +711,7 @@ async function main() {
       npcs.update(delta);
       pets.update(delta);
       animals.update(delta);
+      sprinklers.update(delta);
 
       // Smooth camera follow
       sceneManager.updateCamera(delta);
