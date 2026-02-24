@@ -114,6 +114,9 @@ async function main() {
   try {
     const state = await network.connect(playerName, playerAppearance);
 
+    // Store static crop definitions for tooltips
+    const cropsData = state.cropsData || {};
+
     // Activate debug instrumentation
     debugClient.init(state.playerId);
     debugClient.log('INIT', 'Connected to server', {
@@ -269,7 +272,7 @@ async function main() {
     // --- Selection / Hover / Context Menu ---
     const selectionManager = new SelectionManager(sceneManager.scene, {
       npcs, animals, pets, machines, crops, forage,
-    }, network);
+    }, network, { cropsData, getTime: () => hud._lastTime });
 
     input.on('tileHover', (hoverData) => {
       selectionManager.updateHover(hoverData);

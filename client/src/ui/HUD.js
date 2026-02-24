@@ -199,6 +199,7 @@ export class HUD {
   }
 
   updateTime(data) {
+    this._lastTime = data;
     if (data.season !== undefined) document.getElementById('hud-season').textContent = SEASON_NAMES[data.season];
     if (data.day !== undefined) document.getElementById('hud-day').textContent = `Day ${data.day}`;
     if (data.hour !== undefined) {

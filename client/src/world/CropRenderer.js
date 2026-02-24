@@ -81,6 +81,17 @@ export class CropRenderer {
     }
   }
 
+  getCropAtPosition(worldX, worldZ) {
+    const tileX = Math.floor(worldX);
+    const tileZ = Math.floor(worldZ);
+    for (const [id, entry] of this.cropMeshes) {
+      if (entry.data.tileX === tileX && entry.data.tileZ === tileZ) {
+        return { id, ...entry.data };
+      }
+    }
+    return null;
+  }
+
   update(delta) {
     // Advance the shared time uniform — all crop shaders read from this
     this._timeUniform.value += delta;

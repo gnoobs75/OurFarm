@@ -1705,6 +1705,7 @@ export class GameWorld {
       tiles: mapState.tiles,
       decorations: mapState.decorations,
       crops: mapState.crops,
+      cropsData,
       animals: mapState.animals,
       pets: mapState.pets,
       npcs: mapState.npcs,
