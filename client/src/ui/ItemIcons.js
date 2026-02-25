@@ -13,6 +13,18 @@ const ITEMS = {
   wood:         { emoji: '\u{1FAB5}', color: '#8b6b4a', name: 'Wood' },
   stone:        { emoji: '\u{1FAA8}', color: '#888899', name: 'Stone' },
 
+  // Fruits
+  apple:        { emoji: '\u{1F34E}', color: '#cc3333', name: 'Apple' },
+  cherry:       { emoji: '\u{1F352}', color: '#dd2255', name: 'Cherry' },
+  orange:       { emoji: '\u{1F34A}', color: '#ff8800', name: 'Orange' },
+  peach:        { emoji: '\u{1F351}', color: '#ffaa88', name: 'Peach' },
+
+  // Saplings
+  apple_sapling:  { emoji: '\u{1F333}', color: '#cc3333', name: 'Apple Sapling' },
+  cherry_sapling: { emoji: '\u{1F333}', color: '#dd2255', name: 'Cherry Sapling' },
+  orange_sapling: { emoji: '\u{1F333}', color: '#ff8800', name: 'Orange Sapling' },
+  peach_sapling:  { emoji: '\u{1F333}', color: '#ffaa88', name: 'Peach Sapling' },
+
   // Seeds
   wheat_seed:      { emoji: '\u{1F331}', color: '#daa520', name: 'Wheat Seeds' },
   corn_seed:       { emoji: '\u{1F331}', color: '#f5d142', name: 'Corn Seeds' },

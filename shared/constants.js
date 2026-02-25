@@ -283,6 +283,25 @@ export const PROFESSIONS = {
   },
 };
 
+// Fruit tree types and data
+export const FRUIT_TYPES = ['apple', 'cherry', 'orange', 'peach'];
+
+export const FRUIT_DATA = {
+  apple:  { name: 'Apple',  sellPrice: 50,  color: 0xcc3333 },
+  cherry: { name: 'Cherry', sellPrice: 40,  color: 0xdd2255 },
+  orange: { name: 'Orange', sellPrice: 60,  color: 0xff8800 },
+  peach:  { name: 'Peach',  sellPrice: 70,  color: 0xffaa88 },
+};
+
+export const FRUIT_REGROW_HOURS = 24; // in-game hours until fruit regrows
+
+export const SAPLING_DATA = {
+  apple_sapling:  { fruitType: 'apple',  growthDays: 7, price: 200 },
+  cherry_sapling: { fruitType: 'cherry', growthDays: 7, price: 150 },
+  orange_sapling: { fruitType: 'orange', growthDays: 7, price: 250 },
+  peach_sapling:  { fruitType: 'peach',  growthDays: 7, price: 300 },
+};
+
 export const RESOURCE_DATA = {
   tree: { health: 5, drops: [{ itemId: 'wood', quantity: 8 }], stumpHealth: 2, stumpDrops: [{ itemId: 'wood', quantity: 2 }], tool: 'axe', xpPerHit: 2 },
   rock: { health: 3, drops: [{ itemId: 'stone', quantity: 5 }], tool: 'pickaxe', xpPerHit: 2 },
