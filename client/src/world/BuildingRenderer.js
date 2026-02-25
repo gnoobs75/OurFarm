@@ -37,7 +37,7 @@ export class BuildingRenderer {
       const mesh = this.assetGen.createBuilding(b.type);
       mesh.position.set(b.tile_x || b.tileX, 0, b.tile_z || b.tileZ);
       this.scene.add(mesh);
-      this.buildingMeshes.set(b.id, mesh);
+      this.buildingMeshes.set(b.id, { mesh, data: b });
 
       // Find and store window material reference + add glow overlays
       this._processWindows(mesh, b);
@@ -47,6 +47,22 @@ export class BuildingRenderer {
         this._addInteriorLight(mesh, b);
       }
     }
+  }
+
+  /** Find a craftable building (mill, forge) near the given world position. */
+  getBuildingAtPosition(worldX, worldZ) {
+    for (const [id, entry] of this.buildingMeshes) {
+      const b = entry.data;
+      if (b.type !== 'mill' && b.type !== 'forge') continue;
+      const bx = (b.tile_x || b.tileX) + 0.5;
+      const bz = (b.tile_z || b.tileZ) + 0.5;
+      const dx = worldX - bx;
+      const dz = worldZ - bz;
+      if (Math.sqrt(dx * dx + dz * dz) < 1.5) {
+        return { id, ...b };
+      }
+    }
+    return null;
   }
 
   /**
@@ -203,7 +219,7 @@ export class BuildingRenderer {
     }
 
     // Remove building meshes from scene
-    for (const mesh of this.buildingMeshes.values()) this.scene.remove(mesh);
+    for (const { mesh } of this.buildingMeshes.values()) this.scene.remove(mesh);
     this.buildingMeshes.clear();
   }
 }
