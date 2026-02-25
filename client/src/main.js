@@ -359,6 +359,18 @@ async function main() {
         return;
       }
 
+      // Proximity check — must be within 2 tiles
+      const playerPos = players.getLocalPlayerPosition(network.playerId);
+      if (playerPos) {
+        const playerTileX = Math.floor(playerPos.x);
+        const playerTileZ = Math.floor(playerPos.z);
+        const dist = Math.abs(playerTileX - tile.x) + Math.abs(playerTileZ - tile.z);
+        if (dist > 2) {
+          showToast('Too far away!', 'fail', '\uD83D\uDEB6');
+          return;
+        }
+      }
+
       const activeItem = hud.getActiveItem();
       if (!activeItem) return;
 
