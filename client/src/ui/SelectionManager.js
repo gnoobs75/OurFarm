@@ -11,6 +11,7 @@ const ENTITY_ACTIONS = {
   machine: ['Insert Item', 'Collect Output'],
   crop:    ['Harvest'],
   forage:  ['Collect'],
+  fruit_tree: ['Shake', 'Chop'],
 };
 
 export class SelectionManager {
@@ -146,6 +147,21 @@ export class SelectionManager {
       };
     }
 
+    // Fruit trees (resources with fruitType)
+    if (this.renderers.resources) {
+      const tileX = Math.floor(x);
+      const tileZ = Math.floor(z);
+      const res = this.renderers.resources.getResourceAtTile(tileX, tileZ);
+      if (res && res.fruitType && !res.isStump) {
+        const fruitName = res.fruitType.charAt(0).toUpperCase() + res.fruitType.slice(1);
+        const detail = res.fruitReady ? `${fruitName} — Ready to shake!` : `${fruitName} — Growing...`;
+        return {
+          type: 'fruit_tree', id: res.id, name: `${fruitName} Tree`,
+          detail, tileX: res.tileX, tileZ: res.tileZ,
+        };
+      }
+    }
+
     return null;
   }
 
@@ -255,6 +271,14 @@ export class SelectionManager {
         break;
       case 'forage':
         // Forage collect uses tile coords
+        break;
+      case 'fruit_tree':
+        if (action === 'Shake' && this._contextEntity) {
+          net.sendTreeShake(this._contextEntity.tileX, this._contextEntity.tileZ);
+        }
+        if (action === 'Chop' && this._contextEntity) {
+          net.sendResourceHit(this._contextEntity.tileX, this._contextEntity.tileZ);
+        }
         break;
     }
   }

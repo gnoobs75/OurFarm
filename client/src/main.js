@@ -282,7 +282,7 @@ async function main() {
 
     // --- Selection / Hover / Context Menu ---
     const selectionManager = new SelectionManager(sceneManager.scene, {
-      npcs, animals, pets, machines, crops, forage,
+      npcs, animals, pets, machines, crops, forage, resources,
     }, network, { cropsData, getTime: () => hud._lastTime });
 
     input.on('tileHover', (hoverData) => {
@@ -599,6 +599,16 @@ async function main() {
           break;
         case 'resourceHit':
           resources.onResourceHit(data.resourceId);
+          break;
+        case 'treeShake':
+          resources.onResourceHit(data.resourceId); // reuse shake animation
+          // Spawn harvest sparkles at tree position
+          {
+            const entry = resources._entries.get(data.resourceId);
+            if (entry) {
+              actionEffects.spawnHarvest(entry.data.tileX + 0.5, entry.data.tileZ + 0.5);
+            }
+          }
           break;
         case 'resourceUpdate':
           resources.onResourceUpdate(data.resource);
