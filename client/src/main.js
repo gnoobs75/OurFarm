@@ -39,6 +39,7 @@ import { FishingEffects } from './effects/FishingEffects.js';
 import { ActionEffects } from './world/ActionEffects.js';
 import { FishingUI } from './ui/FishingUI.js';
 import { GroomingUI3D as GroomingUI } from './ui/GroomingUI3D.js';
+import { LootToast } from './ui/LootToast.js';
 
 async function main() {
   // --- Engine Setup ---
@@ -92,6 +93,13 @@ async function main() {
 
   // Wire backpack icon → toggle inventory
   hud.onBackpackClick = () => inventoryUI.toggle();
+
+  // Loot toast system
+  const lootToast = new LootToast();
+  lootToast.setBackpackCallbacks(
+    () => hud.getBackpackRect(),
+    () => hud.pulseBackpack(),
+  );
 
   // Wire gift-giving flow
   dialogueUI.onGiftRequest = (npcId) => {
@@ -608,6 +616,9 @@ async function main() {
           break;
         case 'forageCollected':
           forage.removeForageItem(data.spawnId);
+          break;
+        case 'lootDrop':
+          lootToast.show(data.drops);
           break;
         case 'sprinklerPlaced':
           sprinklers.addSprinkler(data.sprinkler);
