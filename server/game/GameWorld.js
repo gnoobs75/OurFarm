@@ -499,6 +499,12 @@ export class GameWorld {
     logger.info('GAME', `${player.name} transitioned ${oldMap} → ${newMap}`);
   }
 
+  _isPlayerInRange(player, tileX, tileZ, range = 3) {
+    const px = Math.floor(player.x);
+    const pz = Math.floor(player.z);
+    return Math.abs(px - tileX) + Math.abs(pz - tileZ) <= range;
+  }
+
   handleTill(socketId, data) {
     const player = this.players.get(socketId);
     if (!player) return;
@@ -506,6 +512,7 @@ export class GameWorld {
     if (!player.useEnergy(energyCost)) return;
     if (player.currentMap !== MAP_IDS.FARM) return; // only on farm
     if (!isValidTile(data.x, data.z)) return;
+    if (!this._isPlayerInRange(player, data.x, data.z)) return;
 
     const farmMap = this.maps.get(MAP_IDS.FARM);
     const idx = tileIndex(data.x, data.z);
@@ -521,6 +528,7 @@ export class GameWorld {
   handlePlant(socketId, data) {
     const player = this.players.get(socketId);
     if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!this._isPlayerInRange(player, data.x, data.z)) return;
 
     const seedId = data.cropType + '_seed';
     if (!player.hasItem(seedId)) return;
@@ -545,6 +553,7 @@ export class GameWorld {
   handleWater(socketId, data) {
     const player = this.players.get(socketId);
     if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!this._isPlayerInRange(player, data.x, data.z)) return;
     const energyCost = TOOL_ENERGY_COST.watering_can[player.toolTiers?.watering_can || 0] || 1;
     if (!player.useEnergy(energyCost)) return;
 
@@ -561,6 +570,7 @@ export class GameWorld {
   handleHarvest(socketId, data) {
     const player = this.players.get(socketId);
     if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!this._isPlayerInRange(player, data.x, data.z)) return;
     const energyCost = TOOL_ENERGY_COST.pickaxe[player.toolTiers?.pickaxe || 0] || 3;
     if (!player.useEnergy(energyCost)) return;
 
@@ -1360,6 +1370,7 @@ export class GameWorld {
   handleResourceHit(socketId, data) {
     const player = this.players.get(socketId);
     if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!this._isPlayerInRange(player, data.x, data.z)) return;
 
     const farmMap = this.maps.get(MAP_IDS.FARM);
 
