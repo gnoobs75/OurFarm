@@ -282,7 +282,7 @@ async function main() {
 
     // --- Selection / Hover / Context Menu ---
     const selectionManager = new SelectionManager(sceneManager.scene, {
-      npcs, animals, pets, machines, crops, forage, resources,
+      npcs, animals, pets, machines, crops, forage, resources, buildings,
     }, network, { cropsData, getTime: () => hud._lastTime });
 
     input.on('tileHover', (hoverData) => {
@@ -299,6 +299,11 @@ async function main() {
       if (!result) return; // cancelled
 
       network.sendPetGroom(petId, result.stars, result.equipped);
+    };
+
+    selectionManager.onOpenCrafting = (buildingData) => {
+      const b = buildingsMap[buildingData.id] || buildingData;
+      craftingUI.show(b.id, b.type, recipes, localPlayer?.inventory || [], b.processing);
     };
 
     // --- Right-click: Move player ---
