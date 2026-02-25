@@ -58,6 +58,7 @@ export class NPCRenderer {
       mesh.position.set(npc.x, 0, npc.z);
       mesh.userData.npcId = npc.id;
       mesh.userData.name = npc.name;
+      mesh.userData.role = npc.role;
 
       // Blob shadow — child of group so it follows XZ automatically
       const shadow = _createShadow(0.25);

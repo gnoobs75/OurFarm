@@ -84,8 +84,10 @@ export class SelectionManager {
     const npcId = this.renderers.npcs.getNPCAtPosition(x, z);
     if (npcId) {
       const entry = this.renderers.npcs.npcMeshes.get(npcId);
-      const name = entry?.mesh?.userData?.name || 'Villager';
-      return { type: 'npc', id: npcId, name, detail: 'Villager' };
+      const data = entry?.mesh?.userData || {};
+      const name = data.name || 'Villager';
+      const role = data.role || 'Villager';
+      return { type: 'npc', id: npcId, name, detail: role };
     }
 
     // Animals
@@ -94,16 +96,22 @@ export class SelectionManager {
       const entry = this.renderers.animals.animalMeshes.get(animalId);
       const data = entry?.data || {};
       const name = data.name || data.type || 'Animal';
-      const detail = data.happiness !== undefined ? `Happiness: ${data.happiness}/10` : data.type;
-      return { type: 'animal', id: animalId, name, detail };
+      const detail = [];
+      if (data.type) detail.push(data.type.charAt(0).toUpperCase() + data.type.slice(1));
+      if (data.happiness !== undefined) detail.push(`Happiness: ${data.happiness}/10`);
+      if (data.productReady) detail.push('Product ready!');
+      return { type: 'animal', id: animalId, name, detail: detail.join(' \u00B7 ') };
     }
 
     // Pets
     const petId = this.renderers.pets.getPetAtPosition(x, z);
     if (petId) {
       const entry = this.renderers.pets.petMeshes.get(petId);
-      const name = entry?.mesh?.userData?.name || entry?.data?.name || 'Pet';
-      return { type: 'pet', id: petId, name, detail: entry?.data?.type || 'Pet' };
+      const data = entry?.data || {};
+      const name = data.name || 'Pet';
+      const type = data.type ? data.type.charAt(0).toUpperCase() + data.type.slice(1) : 'Pet';
+      const affection = data.affection !== undefined ? ` \u00B7 \u2764\uFE0F ${data.affection}/10` : '';
+      return { type: 'pet', id: petId, name, detail: type + affection };
     }
 
     // Machines
@@ -111,8 +119,16 @@ export class SelectionManager {
     if (machineId) {
       const entry = this.renderers.machines.machineMeshes.get(machineId);
       const data = entry?.data || {};
-      const detail = data.processing?.ready ? 'Ready to collect' : data.processing ? 'Processing...' : 'Empty';
-      return { type: 'machine', id: machineId, name: data.type || 'Machine', detail };
+      let detail;
+      if (data.processing?.ready) {
+        detail = '\u2705 Ready to collect';
+      } else if (data.processing) {
+        detail = '\u2699\uFE0F Processing...';
+      } else {
+        detail = 'Empty';
+      }
+      const typeName = (data.type || 'Machine').replace(/_/g, ' ');
+      return { type: 'machine', id: machineId, name: typeName, detail };
     }
 
     // Crops
