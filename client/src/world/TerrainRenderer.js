@@ -45,8 +45,12 @@ export class TerrainRenderer {
     );
 
     // Vertex corner offsets: [0,0], [1,0], [1,1], [0,1]
+    // Tiny outward shift per corner to prevent sub-pixel seam gaps
+    const SEAM_FIX = 0.005;
     const cornerDx = [0, 1, 1, 0];
     const cornerDz = [0, 0, 1, 1];
+    const cornerShiftX = [-SEAM_FIX, SEAM_FIX, SEAM_FIX, -SEAM_FIX];
+    const cornerShiftZ = [-SEAM_FIX, -SEAM_FIX, SEAM_FIX, SEAM_FIX];
 
     for (let i = 0; i < tiles.length; i++) {
       const tile = tiles[i];
@@ -90,7 +94,7 @@ export class TerrainRenderer {
           // Subtle undulation using a slower noise frequency
           y += this._noise(vx * 0.7, vz * 0.7) * 0.04;
         }
-        vertices.push(baseX + cornerDx[j] * TILE_SIZE, y, baseZ + cornerDz[j] * TILE_SIZE);
+        vertices.push(baseX + cornerDx[j] * TILE_SIZE + cornerShiftX[j], y, baseZ + cornerDz[j] * TILE_SIZE + cornerShiftZ[j]);
 
         // --- Color ---
         const vc = baseColor.clone();
