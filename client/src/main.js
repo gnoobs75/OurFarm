@@ -90,6 +90,9 @@ async function main() {
     hud.addToFirstEmptySlot(itemId);
   };
 
+  // Wire backpack icon → toggle inventory
+  hud.onBackpackClick = () => inventoryUI.toggle();
+
   // Wire gift-giving flow
   dialogueUI.onGiftRequest = (npcId) => {
     const activeItem = hud.getActiveItem();

@@ -14,6 +14,7 @@ export class HUD {
     this.container = container;
     this.activeSlot = 0;
     this.onSlotSelect = null;
+    this.onBackpackClick = null;
 
     // Action bar data: array of { itemId, quantity? } or null
     this.actionBarSlots = new Array(SLOT_COUNT).fill(null);
@@ -90,6 +91,16 @@ export class HUD {
       const dir = e.deltaY > 0 ? 1 : -1;
       this.selectSlot((this.activeSlot + dir + SLOT_COUNT) % SLOT_COUNT);
     });
+
+    // Backpack icon
+    this._backpackIcon = document.createElement('div');
+    this._backpackIcon.className = 'hud-backpack';
+    this._backpackIcon.textContent = '\uD83C\uDF92';
+    this._backpackIcon.title = 'Backpack (I)';
+    this._backpackIcon.addEventListener('click', () => {
+      if (this.onBackpackClick) this.onBackpackClick();
+    });
+    document.getElementById('ui-overlay').appendChild(this._backpackIcon);
   }
 
   /** Pre-fill action bar: tools in slots 0-4, seeds starting slot 5 */
@@ -241,5 +252,14 @@ export class HUD {
 
   updateWeather(weather) {
     document.getElementById('hud-weather').textContent = WEATHER_ICONS[weather] || 'Sunny';
+  }
+
+  pulseBackpack() {
+    this._backpackIcon.classList.add('backpack-pulse');
+    setTimeout(() => this._backpackIcon.classList.remove('backpack-pulse'), 600);
+  }
+
+  getBackpackRect() {
+    return this._backpackIcon.getBoundingClientRect();
   }
 }
