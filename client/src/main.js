@@ -405,6 +405,11 @@ async function main() {
           actionEffects.spawnPlanting(tile.x + 0.5, tile.z + 0.5);
           break;
         }
+        case 'sapling': {
+          network.sendPlant(tile.x, tile.z, activeItem.itemId);
+          actionEffects.spawnPlanting(tile.x + 0.5, tile.z + 0.5);
+          break;
+        }
         case 'fishing_rod': {
           // Don't cast if already fishing
           if (fishingState) break;
@@ -615,6 +620,9 @@ async function main() {
           break;
         case 'resourceRemoved':
           resources.removeResource(data.resourceId);
+          break;
+        case 'resourceAdded':
+          resources.addResource(data.resource);
           break;
         case 'tileChangeBatch':
           for (const t of data.tiles) {

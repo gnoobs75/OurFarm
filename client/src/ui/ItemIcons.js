@@ -140,6 +140,7 @@ export function getItemIcon(itemId) {
 export function getToolAction(itemId) {
   if (TOOL_ACTIONS[itemId]) return TOOL_ACTIONS[itemId];
   if (isSeed(itemId)) return 'seeds';
+  if (isSapling(itemId)) return 'sapling';
   if (itemId && itemId.startsWith('sprinkler_')) return 'sprinkler';
   if (itemId && (itemId.startsWith('fertilizer_') || itemId.includes('speed_gro'))) return 'fertilizer';
   if (['keg', 'preserves_jar', 'cheese_press', 'mayonnaise_machine'].includes(itemId)) return 'machine';
@@ -152,4 +153,8 @@ export function isTool(itemId) {
 
 export function isSeed(itemId) {
   return itemId && itemId.endsWith('_seed');
+}
+
+export function isSapling(itemId) {
+  return itemId && itemId.endsWith('_sapling');
 }

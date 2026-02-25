@@ -22,5 +22,9 @@
   "starfruit":   { "name": "Starfruit",   "buyPrice": 200, "sellPrice": 750, "growthTime": 13, "season": [1],    "xp": 25, "regrows": false },
   "coffee_bean": { "name": "Coffee Bean", "buyPrice": 100, "sellPrice": 15,  "growthTime": 10, "season": [0, 1], "xp": 8,  "regrows": true },
   "sunflower":   { "name": "Sunflower",   "buyPrice": 20,  "sellPrice": 40,  "growthTime": 8,  "season": [1, 2], "xp": 10, "regrows": false },
-  "carrot":      { "name": "Carrot",      "buyPrice": 8,   "sellPrice": 20,  "growthTime": 3,  "season": [0],    "xp": 6,  "regrows": false }
+  "carrot":      { "name": "Carrot",      "buyPrice": 8,   "sellPrice": 20,  "growthTime": 3,  "season": [0],    "xp": 6,  "regrows": false },
+  "apple_sapling":  { "name": "Apple Sapling",  "buyPrice": 200, "sellPrice": 0, "growthTime": 168, "season": [0,1,2], "xp": 20, "regrows": false, "isSapling": true, "fruitType": "apple"  },
+  "cherry_sapling": { "name": "Cherry Sapling", "buyPrice": 150, "sellPrice": 0, "growthTime": 168, "season": [0,1,2], "xp": 20, "regrows": false, "isSapling": true, "fruitType": "cherry" },
+  "orange_sapling": { "name": "Orange Sapling", "buyPrice": 250, "sellPrice": 0, "growthTime": 168, "season": [0,1,2], "xp": 20, "regrows": false, "isSapling": true, "fruitType": "orange" },
+  "peach_sapling":  { "name": "Peach Sapling",  "buyPrice": 300, "sellPrice": 0, "growthTime": 168, "season": [0,1,2], "xp": 20, "regrows": false, "isSapling": true, "fruitType": "peach"  }
 }

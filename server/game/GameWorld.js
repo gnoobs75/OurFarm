@@ -268,9 +268,38 @@ export class GameWorld {
 
     // Update crops on farm map
     const farmMap = this.maps.get(MAP_IDS.FARM);
-    for (const crop of farmMap.crops.values()) {
+    const saplingsToConvert = [];
+    for (const [id, crop] of farmMap.crops.entries()) {
       const data = cropsData[crop.cropType];
       if (data) crop.tick(gameHoursElapsed, data);
+      // Sapling reached maturity → convert to fruit tree
+      if (data?.isSapling && crop.stage >= 3) {
+        saplingsToConvert.push({ id, crop, fruitType: data.fruitType });
+      }
+    }
+    for (const { id, crop, fruitType } of saplingsToConvert) {
+      farmMap.crops.delete(id);
+      const resource = new Resource({
+        tileX: crop.tileX, tileZ: crop.tileZ, type: 'tree',
+        variant: Math.floor(Math.random() * 3),
+        health: RESOURCE_DATA.tree.health,
+        fruitType, fruitReady: true,
+      });
+      farmMap.resources.set(resource.id, resource);
+      // Revert tile from tilled to grass (trees stand on grass)
+      const idx = tileIndex(crop.tileX, crop.tileZ);
+      if (idx >= 0 && idx < farmMap.tiles.length) {
+        farmMap.tiles[idx].type = TILE_TYPES.GRASS;
+      }
+      this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+        type: 'cropHarvested', cropId: id, x: crop.tileX, z: crop.tileZ,
+      });
+      this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+        type: 'tileChange', x: crop.tileX, z: crop.tileZ, tileType: TILE_TYPES.GRASS,
+      });
+      this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+        type: 'resourceAdded', resource: resource.getState(),
+      });
     }
 
     // Fruit tree regrowth
@@ -550,7 +579,9 @@ export class GameWorld {
     if (!player || player.currentMap !== MAP_IDS.FARM) return;
     if (!this._isPlayerInRange(player, data.x, data.z)) return;
 
-    const seedId = data.cropType + '_seed';
+    // Saplings use the sapling item directly; crops use cropType_seed
+    const isSapling = !!SAPLING_DATA[data.cropType];
+    const seedId = isSapling ? data.cropType : data.cropType + '_seed';
     if (!player.hasItem(seedId)) return;
     if (!isValidTile(data.x, data.z)) return;
 
