@@ -148,6 +148,13 @@ export class GameWorld {
 
   _initStarterFarm() {
     const farmMap = this.maps.get(MAP_IDS.FARM);
+
+    // Load persisted machines
+    const savedMachines = this._loadMachines(this.worldId);
+    for (const machine of savedMachines) {
+      farmMap.machines.set(machine.id, machine);
+    }
+
     if (farmMap.buildings.size > 0) return;
 
     const cx = 32, cz = 32;
@@ -412,6 +419,7 @@ export class GameWorld {
       this._savePlayerSkills(player);
     }
 
+    this._saveMachines();
     this._saveWorldState();
     this._broadcastWorldUpdate();
   }
@@ -1312,6 +1320,7 @@ export class GameWorld {
     player.removeItem(data.machineType, 1);
     const machine = new Machine({ type: data.machineType, tileX: data.x, tileZ: data.z });
     farmMap.machines.set(machine.id, machine);
+    this._saveMachines();
 
     this._sendInventoryUpdate(socketId, player);
     this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
@@ -1366,6 +1375,7 @@ export class GameWorld {
     this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
       type: 'machineUpdate', machine: machine.getState(),
     });
+    this._saveMachines();
   }
 
   handleMachineCollect(socketId, data) {
@@ -1387,6 +1397,7 @@ export class GameWorld {
     this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
       type: 'machineUpdate', machine: machine.getState(),
     });
+    this._saveMachines();
   }
 
   // --- Foraging ---
@@ -1875,6 +1886,55 @@ export class GameWorld {
         .run(JSON.stringify(player.professions), player.id);
     });
     saveAll();
+  }
+
+
+  _loadMachines(worldId) {
+    const db = getDB();
+    const rows = db.prepare('SELECT * FROM machines WHERE world_id = ?').all(worldId);
+    const machines = [];
+    for (const row of rows) {
+      const processing = row.processing_output ? {
+        inputItem: row.processing_input,
+        outputItem: row.processing_output,
+        outputValue: row.processing_value || 0,
+        startTime: row.processing_start,
+        endTime: row.processing_end,
+      } : null;
+      machines.push(new Machine({
+        id: row.id,
+        type: row.type,
+        tileX: row.tile_x,
+        tileZ: row.tile_z,
+        processing,
+      }));
+    }
+    return machines;
+  }
+
+  _saveMachines() {
+    const db = getDB();
+    const upsert = db.prepare(`
+      INSERT OR REPLACE INTO machines (id, world_id, type, tile_x, tile_z,
+        processing_input, processing_output, processing_value, processing_start, processing_end)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const save = db.transaction(() => {
+      for (const map of this.maps.values()) {
+        for (const m of map.machines.values()) {
+          upsert.run(
+            m.id, this.worldId, m.type, m.tileX, m.tileZ,
+            m.processing?.inputItem || null,
+            m.processing?.outputItem || null,
+            m.processing?.outputValue || 0,
+            m.processing?.startTime || null,
+            m.processing?.endTime || null
+          );
+        }
+      }
+    });
+    save();
   }
 
   _saveWorldState() {

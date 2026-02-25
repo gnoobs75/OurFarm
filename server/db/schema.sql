@@ -130,3 +130,17 @@ CREATE TABLE IF NOT EXISTS buildings (
   processing_done INTEGER DEFAULT 0,
   FOREIGN KEY (world_id) REFERENCES worlds(id)
 );
+
+CREATE TABLE IF NOT EXISTS machines (
+  id TEXT PRIMARY KEY,
+  world_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  tile_x INTEGER NOT NULL,
+  tile_z INTEGER NOT NULL,
+  processing_input TEXT,
+  processing_output TEXT,
+  processing_value INTEGER DEFAULT 0,
+  processing_start INTEGER,
+  processing_end INTEGER,
+  FOREIGN KEY (world_id) REFERENCES worlds(id)
+);
