@@ -1769,3 +1769,49 @@ body {
     height: 44px;
   }
 }
+
+/* ── Machine UI (item picker for processing machines) ───────────── */
+.machine-ui {
+  position: absolute;
+  background: rgba(20, 20, 30, 0.95);
+  border: 2px solid #5588aa;
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 160px;
+  max-width: 240px;
+  z-index: 1000;
+  font-family: monospace;
+  color: #e0e0e0;
+}
+.machine-ui.hidden { display: none; }
+.machine-ui-header {
+  font-weight: bold;
+  color: #aaddff;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.machine-ui-empty {
+  color: #888;
+  font-size: 12px;
+  padding: 4px 0;
+}
+.machine-ui-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.machine-ui-item {
+  background: rgba(50, 70, 90, 0.8);
+  border: 1px solid #446;
+  border-radius: 4px;
+  color: #e0e0e0;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 13px;
+  text-align: left;
+}
+.machine-ui-item:hover {
+  background: rgba(70, 110, 140, 0.9);
+  border-color: #6af;
+}
