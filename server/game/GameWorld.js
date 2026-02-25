@@ -1860,6 +1860,7 @@ export class GameWorld {
       time: this.time.getState(),
       weather: this.weather.getState(),
       recipes: recipesData,
+      machinesData,
       forageItems: player.currentMap === MAP_IDS.FARM
         ? this.farmForaging.getState()
         : this.townForaging.getState(),

@@ -35,6 +35,7 @@ export class SelectionManager {
 
     this.onGroom = null;
     this.onOpenCrafting = null;
+    this.onMachineInsert = null;
     this._contextEntity = null;
 
     // Close context menu on click outside
@@ -283,7 +284,11 @@ export class SelectionManager {
         break;
       case 'machine':
         if (action === 'Collect Output') net.sendMachineCollect(entityId);
-        // 'Insert Item' requires active item — handled via existing HUD flow
+        if (action === 'Insert Item') {
+          if (this.onMachineInsert) {
+            this.onMachineInsert(entityId, this._contextEntity);
+          }
+        }
         break;
       case 'building':
         if (action === 'Open Crafting') {
