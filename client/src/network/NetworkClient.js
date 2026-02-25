@@ -90,6 +90,7 @@ export class NetworkClient {
   sendShipItem(itemId, quantity = 1) { this.socket.emit(ACTIONS.SHIP_ITEM, { itemId, quantity }); }
   sendProfessionChoice(skill, professionId) { this.socket.emit(ACTIONS.PROFESSION_CHOICE, { skill, professionId }); }
   sendResourceHit(tileX, tileZ) { this.socket.emit(ACTIONS.RESOURCE_HIT, { x: tileX, z: tileZ }); }
+  sendTreeShake(tileX, tileZ) { this.socket.emit('farm:treeShake', { x: tileX, z: tileZ }); }
   sendMultiTill(tiles) { this.socket.emit(ACTIONS.MULTI_TILL, { tiles }); }
   sendMultiWater(tiles) { this.socket.emit(ACTIONS.MULTI_WATER, { tiles }); }
   sendMultiPlant(tiles, cropType) { this.socket.emit(ACTIONS.MULTI_PLANT, { tiles, cropType }); }

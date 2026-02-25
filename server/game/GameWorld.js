@@ -4,7 +4,7 @@
 // Supports multiple maps (farm, town) with portal transitions.
 
 import { v4 as uuid } from 'uuid';
-import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA, FERTILIZER_DATA, FORAGE_ITEMS, PROFESSIONS, RESOURCE_DATA, HOLD_EXPAND_ENERGY_MULT, DAYS_PER_SEASON } from '../../shared/constants.js';
+import { TICK_RATE, TILE_TYPES, ACTIONS, TIME_SCALE, SKILLS, QUALITY_MULTIPLIER, CROP_STAGES, MAP_IDS, GIFT_POINTS, TOOL_TIERS, TOOL_UPGRADE_COST, TOOL_ENERGY_COST, SPRINKLER_DATA, FERTILIZER_DATA, FORAGE_ITEMS, PROFESSIONS, RESOURCE_DATA, HOLD_EXPAND_ENERGY_MULT, DAYS_PER_SEASON, FRUIT_TYPES, FRUIT_REGROW_HOURS, SAPLING_DATA } from '../../shared/constants.js';
 import { isValidTile, tileIndex, tileToWorld } from '../../shared/TileMap.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
 import { DecorationGenerator } from './DecorationGenerator.js';
@@ -99,11 +99,17 @@ export class GameWorld {
     // Populate resource entities from extracted trees/rocks
     for (const dec of farmResources) {
       const resData = RESOURCE_DATA[dec.type];
-      const resource = new Resource({
+      const opts = {
         tileX: dec.x, tileZ: dec.z, type: dec.type,
         variant: dec.variant || 0,
         health: resData.health,
-      });
+      };
+      // ~25% of trees become fruit trees
+      if (dec.type === 'tree' && Math.random() < 0.25) {
+        opts.fruitType = FRUIT_TYPES[Math.floor(Math.random() * FRUIT_TYPES.length)];
+        opts.fruitReady = true;
+      }
+      const resource = new Resource(opts);
       farmMap.resources.set(resource.id, resource);
     }
 
@@ -265,6 +271,20 @@ export class GameWorld {
     for (const crop of farmMap.crops.values()) {
       const data = cropsData[crop.cropType];
       if (data) crop.tick(gameHoursElapsed, data);
+    }
+
+    // Fruit tree regrowth
+    for (const resource of farmMap.resources.values()) {
+      if (resource.fruitType && !resource.fruitReady && resource.fruitTimer > 0) {
+        resource.fruitTimer -= gameHoursElapsed;
+        if (resource.fruitTimer <= 0) {
+          resource.fruitReady = true;
+          resource.fruitTimer = 0;
+          this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+            type: 'resourceUpdate', resource: resource.getState(),
+          });
+        }
+      }
     }
 
     // Animal product timers
@@ -1465,6 +1485,45 @@ export class GameWorld {
       });
       this._sendInventoryUpdate(socketId, player);
     }
+  }
+
+  // --- Fruit tree shake ---
+
+  handleTreeShake(socketId, data) {
+    const player = this.players.get(socketId);
+    if (!player || player.currentMap !== MAP_IDS.FARM) return;
+    if (!this._isPlayerInRange(player, data.x, data.z)) return;
+
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    let resource = null;
+    for (const r of farmMap.resources.values()) {
+      if (r.tileX === data.x && r.tileZ === data.z) { resource = r; break; }
+    }
+    if (!resource || !resource.fruitType || !resource.fruitReady || resource.isStump) return;
+
+    // Award fruit (1-3)
+    const qty = 1 + Math.floor(Math.random() * 3);
+    player.addItem(resource.fruitType, qty);
+    player.addSkillXP(SKILLS.FORAGING, 5);
+    this._checkPendingProfession(socketId, player);
+
+    // Mark fruit as harvested
+    resource.fruitReady = false;
+    resource.fruitTimer = FRUIT_REGROW_HOURS;
+
+    // Notify client of loot
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'lootDrop', drops: [{ itemId: resource.fruitType, quantity: qty }],
+    });
+    // Broadcast shake animation to all
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'treeShake', resourceId: resource.id,
+    });
+    // Broadcast updated resource state (fruitReady: false)
+    this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
+      type: 'resourceUpdate', resource: resource.getState(),
+    });
+    this._sendInventoryUpdate(socketId, player);
   }
 
   // --- Multi-tile handlers ---
