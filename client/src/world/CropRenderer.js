@@ -58,6 +58,11 @@ export class CropRenderer {
     const swayIntensity = STAGE_SWAY[crop.stage] ?? 0;
     this._injectWindShader(mesh, pos, swayIntensity);
 
+    // Harvestable glow
+    if (crop.stage >= 3) {
+      this._applyHarvestGlow(mesh);
+    }
+
     this.scene.add(mesh);
     this.cropMeshes.set(crop.id, { mesh, data: crop });
   }
@@ -95,6 +100,16 @@ export class CropRenderer {
   update(delta) {
     // Advance the shared time uniform — all crop shaders read from this
     this._timeUniform.value += delta;
+
+    // Pulse harvestable crop glow
+    const glowIntensity = 0.08 + Math.sin(this._timeUniform.value * 2.5) * 0.06;
+    for (const { mesh } of this.cropMeshes.values()) {
+      mesh.traverse((child) => {
+        if (child.userData.harvestGlow) {
+          child.material.emissiveIntensity = glowIntensity;
+        }
+      });
+    }
   }
 
   dispose() {
@@ -112,6 +127,16 @@ export class CropRenderer {
    * mesh material.  Materials are cloned so the shared AssetGenerator cache
    * is not mutated (other objects using the same colour won't start swaying).
    */
+  _applyHarvestGlow(group) {
+    group.traverse((child) => {
+      if (!child.isMesh) return;
+      // Material was already cloned by _injectWindShader for stage 3
+      child.material.emissive = new THREE.Color(0xffd700);
+      child.material.emissiveIntensity = 0;
+      child.userData.harvestGlow = true;
+    });
+  }
+
   _injectWindShader(group, worldPos, swayIntensity) {
     // Nothing to inject for seeds — skip the traversal entirely
     if (swayIntensity === 0) return;
