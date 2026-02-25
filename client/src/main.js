@@ -129,12 +129,12 @@ async function main() {
     });
 
     // --- Toast notification helper ---
-    function showToast(message, type = '') {
+    function showToast(message, type = '', icon = '') {
       const container = document.getElementById('toast-container');
       if (!container) return;
       const toast = document.createElement('div');
       toast.className = 'toast' + (type ? ` toast-${type}` : '');
-      toast.textContent = message;
+      toast.textContent = (icon ? icon + ' ' : '') + message;
       container.appendChild(toast);
       setTimeout(() => {
         if (toast.parentNode) toast.parentNode.removeChild(toast);
@@ -202,10 +202,10 @@ async function main() {
       // Play outcome effects
       if (caught) {
         fishingEffects.playCatch();
-        showToast(`Caught a ${biteData.fishName}!`, 'success');
+        showToast(`Caught a ${biteData.fishName}!`, 'success', '\uD83C\uDF1F');
       } else {
         fishingEffects.playMiss();
-        showToast('The fish got away...', 'fail');
+        showToast('The fish got away...', 'fail', '\uD83D\uDCA8');
       }
     }
 
@@ -567,11 +567,11 @@ async function main() {
             const entry = pets.petMeshes.get(data.pet.id);
             if (entry) entry.data = data.pet;
             if (data.newCosmetic) {
-              showToast(`New cosmetic: ${data.newCosmetic.name}!`, 'success');
+              showToast(`New cosmetic: ${data.newCosmetic.name}!`, 'success', '\u2728');
             }
-            showToast(`${data.pet.name} loved the grooming! (+${data.happinessGain} happiness)`, 'success');
+            showToast(`${data.pet.name} loved the grooming! (+${data.happinessGain} happiness)`, 'success', '\u2764\uFE0F');
           } else {
-            showToast(data.message || 'Already groomed today', 'fail');
+            showToast(data.message || 'Already groomed today', 'fail', '\u23F3');
           }
           break;
         case 'resourceHit':
