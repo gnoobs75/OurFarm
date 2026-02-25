@@ -586,6 +586,11 @@ export class GameWorld {
         player.addSkillXP(SKILLS.FARMING, cropData.xp);
         this._checkPendingProfession(socketId, player);
 
+        // Notify client of loot
+        this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+          type: 'lootDrop', drops: [{ itemId: crop.cropType, quantity: yield_ }],
+        });
+
         if (cropData.regrows) {
           crop.stage = CROP_STAGES.MATURE;
           crop.growth = 0;
@@ -880,6 +885,11 @@ export class GameWorld {
     player.addItem(animalData.product, 1, quality);
     player.addSkillXP(SKILLS.FARMING, 5);
     this._checkPendingProfession(socketId, player);
+
+    // Notify client of loot
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'lootDrop', drops: [{ itemId: animalData.product, quantity: 1 }],
+    });
 
     this._sendInventoryUpdate(socketId, player);
     this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
@@ -1349,6 +1359,11 @@ export class GameWorld {
     player.addSkillXP(SKILLS.FORAGING, 7);
     this._checkPendingProfession(socketId, player);
 
+    // Notify client of loot
+    this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+      type: 'lootDrop', drops: [{ itemId: spawn.itemId, quantity: qty }],
+    });
+
     this._sendInventoryUpdate(socketId, player);
     this._broadcastToMap(player.currentMap, ACTIONS.WORLD_UPDATE, {
       type: 'forageCollected', spawnId: spawn.id,
@@ -1407,6 +1422,10 @@ export class GameWorld {
         for (const drop of resData.drops) {
           player.addItem(drop.itemId, drop.quantity);
         }
+        // Notify client of loot
+        this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+          type: 'lootDrop', drops: resData.drops.map(d => ({ itemId: d.itemId, quantity: d.quantity })),
+        });
         resource.isStump = true;
         resource.health = resData.stumpHealth;
         this._broadcastToMap(MAP_IDS.FARM, ACTIONS.WORLD_UPDATE, {
@@ -1419,6 +1438,10 @@ export class GameWorld {
           for (const drop of drops) {
             player.addItem(drop.itemId, drop.quantity);
           }
+          // Notify client of loot
+          this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
+            type: 'lootDrop', drops: drops.map(d => ({ itemId: d.itemId, quantity: d.quantity })),
+          });
         }
 
         // If rock was on STONE tile, revert to GRASS
