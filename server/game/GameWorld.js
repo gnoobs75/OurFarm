@@ -1921,25 +1921,30 @@ export class GameWorld {
 
   _saveMachines() {
     const db = getDB();
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    if (!farmMap) return;
+
     const upsert = db.prepare(`
       INSERT OR REPLACE INTO machines (id, world_id, type, tile_x, tile_z,
         processing_input, processing_output, processing_value, processing_start, processing_end)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const deleteStale = db.prepare('DELETE FROM machines WHERE world_id = ? AND id NOT IN (SELECT value FROM json_each(?))');
 
     const save = db.transaction(() => {
-      for (const map of this.maps.values()) {
-        for (const m of map.machines.values()) {
-          upsert.run(
-            m.id, this.worldId, m.type, m.tileX, m.tileZ,
-            m.processing?.inputItem || null,
-            m.processing?.outputItem || null,
-            m.processing?.outputValue || 0,
-            m.processing?.startTime || null,
-            m.processing?.endTime || null
-          );
-        }
+      const ids = [];
+      for (const m of farmMap.machines.values()) {
+        ids.push(m.id);
+        upsert.run(
+          m.id, this.worldId, m.type, m.tileX, m.tileZ,
+          m.processing?.inputItem || null,
+          m.processing?.outputItem || null,
+          m.processing?.outputValue || 0,
+          m.processing?.startTime || null,
+          m.processing?.endTime || null
+        );
       }
+      deleteStale.run(this.worldId, JSON.stringify(ids));
     });
     save();
   }
@@ -1947,38 +1952,44 @@ export class GameWorld {
   _loadBuildings(worldId) {
     const db = getDB();
     const rows = db.prepare('SELECT * FROM buildings WHERE world_id = ?').all(worldId);
-    return rows.map(row => ({
-      id: row.id,
-      type: row.type,
-      tileX: row.tile_x,
-      tileZ: row.tile_z,
-      processing: row.processing_recipe ? {
-        recipeId: row.processing_recipe,
-        startTime: parseInt(row.processing_start) || 0,
-        endTime: parseInt(row.processing_start || 0) + (row.processing_done ? 0 : 3600000),
-      } : null,
-    }));
+    return rows.map(row => {
+      let processing = null;
+      if (row.processing_recipe) {
+        const startTime = parseInt(row.processing_start) || 0;
+        // Look up recipe duration, fallback to 1 hour
+        const recipe = recipesData[row.processing_recipe];
+        const durationMs = recipe ? recipe.time * 3600 * 1000 : 3600000;
+        const endTime = row.processing_done ? startTime : startTime + durationMs;
+        processing = { recipeId: row.processing_recipe, startTime, endTime };
+      }
+      return { id: row.id, type: row.type, tileX: row.tile_x, tileZ: row.tile_z, processing };
+    });
   }
 
   _saveBuildings() {
     const db = getDB();
+    const farmMap = this.maps.get(MAP_IDS.FARM);
+    if (!farmMap) return;
+
     const upsert = db.prepare(`
       INSERT OR REPLACE INTO buildings (id, world_id, type, tile_x, tile_z,
         processing_recipe, processing_start, processing_done)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const deleteStale = db.prepare('DELETE FROM buildings WHERE world_id = ? AND id NOT IN (SELECT value FROM json_each(?))');
 
     const save = db.transaction(() => {
-      for (const map of this.maps.values()) {
-        for (const b of map.buildings.values()) {
-          upsert.run(
-            b.id, this.worldId, b.type, b.tileX, b.tileZ,
-            b.processing?.recipeId || null,
-            b.processing?.startTime ? String(b.processing.startTime) : null,
-            b.processing ? (Date.now() >= (b.processing.endTime || 0) ? 1 : 0) : 0
-          );
-        }
+      const ids = [];
+      for (const b of farmMap.buildings.values()) {
+        ids.push(b.id);
+        upsert.run(
+          b.id, this.worldId, b.type, b.tileX, b.tileZ,
+          b.processing?.recipeId || null,
+          b.processing?.startTime ? String(b.processing.startTime) : null,
+          b.processing ? (Date.now() >= (b.processing.endTime || 0) ? 1 : 0) : 0
+        );
       }
+      deleteStale.run(this.worldId, JSON.stringify(ids));
     });
     save();
   }

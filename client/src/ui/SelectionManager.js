@@ -134,7 +134,7 @@ export class SelectionManager {
         detail = 'Empty';
       }
       const typeName = (data.type || 'Machine').replace(/_/g, ' ');
-      return { type: 'machine', id: machineId, name: typeName, detail };
+      return { type: 'machine', id: machineId, name: typeName, detail, machineProcessing: data.processing || null };
     }
 
     // Buildings (craftable: mill, forge)
@@ -220,7 +220,20 @@ export class SelectionManager {
     if (!this._contextMenu) return;
     this._contextEntity = entity;
 
-    const actions = ENTITY_ACTIONS[entity.type] || [];
+    let actions = ENTITY_ACTIONS[entity.type] || [];
+
+    // Filter machine actions by state
+    if (entity.type === 'machine') {
+      const processing = entity.machineProcessing;
+      if (processing?.ready) {
+        actions = ['Collect Output'];
+      } else if (processing) {
+        actions = []; // processing but not ready — no actions
+      } else {
+        actions = ['Insert Item'];
+      }
+    }
+
     if (actions.length === 0) return;
 
     this._contextMenu.innerHTML = actions.map(action =>
