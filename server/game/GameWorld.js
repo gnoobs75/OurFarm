@@ -155,25 +155,28 @@ export class GameWorld {
       farmMap.machines.set(machine.id, machine);
     }
 
-    if (farmMap.buildings.size > 0) return;
+    // Load buildings from DB
+    const savedBuildings = this._loadBuildings(this.worldId);
+    for (const b of savedBuildings) {
+      farmMap.buildings.set(b.id, b);
+    }
+
+    // Seed default buildings if none exist
+    if (farmMap.buildings.size === 0) {
+      const cx = 32, cz = 32;
+      const defaults = [
+        { id: 'house_main', type: 'house', tileX: cx - 3, tileZ: cz - 1 },
+        { id: 'barn_main', type: 'barn', tileX: cx - 4, tileZ: cz + 3 },
+        { id: 'farm_mill', type: 'mill', tileX: 38, tileZ: 31, processing: null },
+        { id: 'farm_forge', type: 'forge', tileX: 38, tileZ: 34, processing: null },
+      ];
+      for (const b of defaults) {
+        farmMap.buildings.set(b.id, b);
+      }
+      this._saveBuildings();
+    }
 
     const cx = 32, cz = 32;
-
-    // Farm buildings
-    farmMap.buildings.set('house_main', {
-      id: 'house_main', type: 'house', tileX: cx - 3, tileZ: cz - 1,
-    });
-    farmMap.buildings.set('barn_main', {
-      id: 'barn_main', type: 'barn', tileX: cx - 4, tileZ: cz + 3,
-    });
-    farmMap.buildings.set('farm_mill', {
-      id: 'farm_mill', type: 'mill', tileX: 38, tileZ: 31,
-      processing: null,
-    });
-    farmMap.buildings.set('farm_forge', {
-      id: 'farm_forge', type: 'forge', tileX: 38, tileZ: 34,
-      processing: null,
-    });
 
     // Pre-till a crop plot
     for (let px = cx + 2; px <= cx + 6; px++) {
@@ -420,6 +423,7 @@ export class GameWorld {
     }
 
     this._saveMachines();
+    this._saveBuildings();
     this._saveWorldState();
     this._broadcastWorldUpdate();
   }
@@ -1088,6 +1092,7 @@ export class GameWorld {
       endTime: now + recipe.time * 3600 * 1000,
     };
 
+    this._saveBuildings();
     this._sendInventoryUpdate(socketId, player);
     this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
       type: 'craftStarted', buildingId: building.id, recipeId: data.recipeId,
@@ -1118,6 +1123,7 @@ export class GameWorld {
     player.addSkillXP(SKILLS.FARMING, recipe.xp || 5);
     this._checkPendingProfession(socketId, player);
     building.processing = null;
+    this._saveBuildings();
 
     this._sendInventoryUpdate(socketId, player);
     this.io.to(socketId).emit(ACTIONS.WORLD_UPDATE, {
@@ -1930,6 +1936,45 @@ export class GameWorld {
             m.processing?.outputValue || 0,
             m.processing?.startTime || null,
             m.processing?.endTime || null
+          );
+        }
+      }
+    });
+    save();
+  }
+
+  _loadBuildings(worldId) {
+    const db = getDB();
+    const rows = db.prepare('SELECT * FROM buildings WHERE world_id = ?').all(worldId);
+    return rows.map(row => ({
+      id: row.id,
+      type: row.type,
+      tileX: row.tile_x,
+      tileZ: row.tile_z,
+      processing: row.processing_recipe ? {
+        recipeId: row.processing_recipe,
+        startTime: parseInt(row.processing_start) || 0,
+        endTime: parseInt(row.processing_start || 0) + (row.processing_done ? 0 : 3600000),
+      } : null,
+    }));
+  }
+
+  _saveBuildings() {
+    const db = getDB();
+    const upsert = db.prepare(`
+      INSERT OR REPLACE INTO buildings (id, world_id, type, tile_x, tile_z,
+        processing_recipe, processing_start, processing_done)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const save = db.transaction(() => {
+      for (const map of this.maps.values()) {
+        for (const b of map.buildings.values()) {
+          upsert.run(
+            b.id, this.worldId, b.type, b.tileX, b.tileZ,
+            b.processing?.recipeId || null,
+            b.processing?.startTime ? String(b.processing.startTime) : null,
+            b.processing ? (Date.now() >= (b.processing.endTime || 0) ? 1 : 0) : 0
           );
         }
       }
