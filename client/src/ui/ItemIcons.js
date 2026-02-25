@@ -9,6 +9,10 @@ const ITEMS = {
   axe:          { emoji: '\u{1FA93}', color: '#8b6b4a', name: 'Axe' },
   fishing_rod:  { emoji: '\u{1F3A3}', color: '#4a7a2a', name: 'Fishing Rod' },
 
+  // Resources
+  wood:         { emoji: '\u{1FAB5}', color: '#8b6b4a', name: 'Wood' },
+  stone:        { emoji: '\u{1FAA8}', color: '#888899', name: 'Stone' },
+
   // Seeds
   wheat_seed:      { emoji: '\u{1F331}', color: '#daa520', name: 'Wheat Seeds' },
   corn_seed:       { emoji: '\u{1F331}', color: '#f5d142', name: 'Corn Seeds' },

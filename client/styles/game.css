@@ -1695,6 +1695,56 @@ body {
   to { opacity: 0; transform: translateY(-10px); }
 }
 
+/* ═══════════════════════════════════════════
+   LOOT TOAST — fly-to-backpack collection feedback
+   ═══════════════════════════════════════════ */
+
+.loot-toast-container {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.loot-toast {
+  background: rgba(30, 22, 14, 0.95);
+  border: 1px solid #8b6914;
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: #f5e6d0;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.loot-toast.loot-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.loot-toast .loot-icon {
+  font-size: 18px;
+}
+
+.loot-toast .loot-text {
+  color: #f5d142;
+}
+
+.loot-toast.loot-exit {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
 @media (max-width: 600px) {
   .splash-body {
     flex-direction: column;
