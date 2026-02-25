@@ -27,6 +27,7 @@ import { HUD } from './ui/HUD.js';
 import { InventoryUI } from './ui/Inventory.js';
 import { DialogueUI } from './ui/DialogueUI.js';
 import { CraftingUI } from './ui/CraftingUI.js';
+import { MachineUI } from './ui/MachineUI.js';
 import { ProfessionUI } from './ui/ProfessionUI.js';
 import { DebugWindow } from './ui/DebugWindow.js';
 import { SplashScreen } from './ui/SplashScreen.js';
@@ -84,6 +85,7 @@ async function main() {
   const debugWindow = new DebugWindow();
   debugWindow.setRenderer(sceneManager.renderer);
   const craftingUI = new CraftingUI();
+  const machineUI = new MachineUI();
   const professionUI = new ProfessionUI();
 
   // Wire backpack right-click → action bar quick-add
@@ -238,8 +240,9 @@ async function main() {
     // Ambient creatures (client-side only)
     let creatures = new AmbientCreatureRenderer(sceneManager.scene, state.tiles);
 
-    // Store recipes and buildings for crafting UI
+    // Store recipes, buildings, and machine data for crafting UI
     const recipes = state.recipes || {};
+    const machinesDataRef = state.machinesData || {};
     const buildingsMap = {};
     for (const b of state.buildings || []) {
       buildingsMap[b.id] = b;
@@ -282,7 +285,7 @@ async function main() {
 
     // --- Selection / Hover / Context Menu ---
     const selectionManager = new SelectionManager(sceneManager.scene, {
-      npcs, animals, pets, machines, crops, forage, resources,
+      npcs, animals, pets, machines, crops, forage, resources, buildings,
     }, network, { cropsData, getTime: () => hud._lastTime });
 
     input.on('tileHover', (hoverData) => {
@@ -299,6 +302,27 @@ async function main() {
       if (!result) return; // cancelled
 
       network.sendPetGroom(petId, result.stars, result.equipped);
+    };
+
+    selectionManager.onOpenCrafting = (buildingData) => {
+      const b = buildingsMap[buildingData.id] || buildingData;
+      craftingUI.show(b.id, b.type, recipes, localPlayer?.inventory || [], b.processing);
+    };
+
+    selectionManager.onMachineInsert = (machineId, entity) => {
+      const machineEntry = machines.machineMeshes.get(machineId);
+      if (!machineEntry) return;
+      const machineType = machineEntry.data.type;
+      machineUI.show(
+        machineId, machineType, machinesDataRef,
+        localPlayer?.inventory || [],
+        cropsData,
+        input.hoveredScreenPos || { x: 300, y: 300 }
+      );
+    };
+
+    machineUI.onItemSelected = (machineId, itemId) => {
+      network.sendMachineInput(machineId, itemId);
     };
 
     // --- Right-click: Move player ---

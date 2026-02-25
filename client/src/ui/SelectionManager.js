@@ -9,6 +9,7 @@ const ENTITY_ACTIONS = {
   pet:     ['Pet', 'Groom'],
   npc:     ['Talk', 'Gift'],
   machine: ['Insert Item', 'Collect Output'],
+  building: ['Open Crafting'],
   crop:    ['Harvest'],
   forage:  ['Collect'],
   fruit_tree: ['Shake', 'Chop'],
@@ -33,6 +34,8 @@ export class SelectionManager {
     this._hoverTime = 0;
 
     this.onGroom = null;
+    this.onOpenCrafting = null;
+    this.onMachineInsert = null;
     this._contextEntity = null;
 
     // Close context menu on click outside
@@ -131,7 +134,26 @@ export class SelectionManager {
         detail = 'Empty';
       }
       const typeName = (data.type || 'Machine').replace(/_/g, ' ');
-      return { type: 'machine', id: machineId, name: typeName, detail };
+      return { type: 'machine', id: machineId, name: typeName, detail, machineProcessing: data.processing || null };
+    }
+
+    // Buildings (craftable: mill, forge)
+    if (this.renderers.buildings) {
+      const building = this.renderers.buildings.getBuildingAtPosition(x, z);
+      if (building) {
+        const typeName = building.type.charAt(0).toUpperCase() + building.type.slice(1);
+        let detail = 'Idle';
+        if (building.processing) {
+          const remaining = Math.max(0, building.processing.endTime - Date.now());
+          if (remaining <= 0) {
+            detail = 'Ready to collect!';
+          } else {
+            const mins = Math.ceil(remaining / 60000);
+            detail = `Processing... ${mins}m left`;
+          }
+        }
+        return { type: 'building', id: building.id, name: typeName, detail, buildingData: building };
+      }
     }
 
     // Crops
@@ -198,7 +220,20 @@ export class SelectionManager {
     if (!this._contextMenu) return;
     this._contextEntity = entity;
 
-    const actions = ENTITY_ACTIONS[entity.type] || [];
+    let actions = ENTITY_ACTIONS[entity.type] || [];
+
+    // Filter machine actions by state
+    if (entity.type === 'machine') {
+      const processing = entity.machineProcessing;
+      if (processing?.ready) {
+        actions = ['Collect Output'];
+      } else if (processing) {
+        actions = []; // processing but not ready — no actions
+      } else {
+        actions = ['Insert Item'];
+      }
+    }
+
     if (actions.length === 0) return;
 
     this._contextMenu.innerHTML = actions.map(action =>
@@ -262,7 +297,18 @@ export class SelectionManager {
         break;
       case 'machine':
         if (action === 'Collect Output') net.sendMachineCollect(entityId);
-        // 'Insert Item' requires active item — handled via existing HUD flow
+        if (action === 'Insert Item') {
+          if (this.onMachineInsert) {
+            this.onMachineInsert(entityId, this._contextEntity);
+          }
+        }
+        break;
+      case 'building':
+        if (action === 'Open Crafting') {
+          if (this.onOpenCrafting) {
+            this.onOpenCrafting(this._contextEntity.buildingData);
+          }
+        }
         break;
       case 'crop':
         if (action === 'Harvest' && this._contextEntity?.cropData) {

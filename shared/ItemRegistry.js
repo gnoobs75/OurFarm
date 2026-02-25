@@ -8,6 +8,7 @@ export const ITEM_CATEGORIES = {
   ORE: 'ore',
   BAR: 'bar',
   PROCESSED: 'processed',
+  RESOURCE: 'resource',
   TOOL: 'tool',
 };
 
@@ -91,6 +92,24 @@ export const ITEMS = {
   cake: { name: 'Cake', category: 'processed' },
   cheese_wheel: { name: 'Cheese Wheel', category: 'processed' },
   cloth: { name: 'Cloth', category: 'processed' },
+  // Artisan goods
+  wine: { name: 'Wine', category: 'processed' },
+  juice: { name: 'Juice', category: 'processed' },
+  preserves: { name: 'Preserves', category: 'processed' },
+  mayonnaise: { name: 'Mayonnaise', category: 'processed' },
+  // Resources
+  coal: { name: 'Coal', category: 'resource' },
+  stone: { name: 'Stone', category: 'resource' },
+  wood: { name: 'Wood', category: 'resource' },
+  // Machines (placeable)
+  keg: { name: 'Keg', category: 'processed' },
+  preserves_jar: { name: 'Preserves Jar', category: 'processed' },
+  cheese_press: { name: 'Cheese Press', category: 'processed' },
+  mayonnaise_machine: { name: 'Mayonnaise Machine', category: 'processed' },
+  // Crafted items
+  sprinkler_basic: { name: 'Basic Sprinkler', category: 'processed' },
+  sprinkler_quality: { name: 'Quality Sprinkler', category: 'processed' },
+  fertilizer_basic: { name: 'Basic Fertilizer', category: 'processed' },
   // Tools
   hoe: { name: 'Hoe', category: 'tool' },
   watering_can: { name: 'Watering Can', category: 'tool' },
