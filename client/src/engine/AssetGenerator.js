@@ -4,6 +4,7 @@
 // Cozy low-poly aesthetic: warm colors, geometric shapes, subtle variation.
 
 import * as THREE from 'three';
+import { FRUIT_DATA } from '@shared/constants.js';
 
 const CROP_CATEGORIES = {
   parsnip: 'root', potato: 'root', carrot: 'root', garlic: 'root', beet: 'root', yam: 'root',
@@ -146,6 +147,36 @@ export class AssetGenerator {
 
     group.userData.type = 'tree';
     return group;
+  }
+
+  /** Add colored fruit dots to a tree group (for fruit trees with ripe fruit) */
+  addFruitDots(treeGroup, fruitType, count = 6) {
+    const color = FRUIT_DATA[fruitType]?.color || 0xff0000;
+    const dotGeo = new THREE.SphereGeometry(0.06, 6, 6);
+    const dotMat = new THREE.MeshStandardMaterial({ color, roughness: 0.4 });
+
+    // Find the canopy center height — use the highest child mesh
+    let canopyY = 0.8;
+    treeGroup.traverse(c => {
+      if (c.isMesh && c.position.y > 0.5) canopyY = Math.max(canopyY, c.position.y);
+    });
+
+    const fruitGroup = new THREE.Group();
+    fruitGroup.userData.isFruitDots = true;
+
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + i * 0.7;
+      const r = 0.25 + (i % 3) * 0.1;
+      const dot = new THREE.Mesh(dotGeo, dotMat);
+      dot.position.set(
+        Math.cos(angle) * r,
+        canopyY + (Math.sin(i * 1.3) * 0.15),
+        Math.sin(angle) * r,
+      );
+      fruitGroup.add(dot);
+    }
+    treeGroup.add(fruitGroup);
+    return fruitGroup;
   }
 
   createStump(variant = 0) {

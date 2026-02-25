@@ -40,6 +40,12 @@ export class ResourceRenderer {
     );
     mesh.userData.resourceId = res.id;
     mesh.userData.resourceType = res.type;
+
+    // Add fruit dots for fruit trees with ripe fruit
+    if (res.fruitType && res.fruitReady && !res.isStump) {
+      this.assetGen.addFruitDots(mesh, res.fruitType);
+    }
+
     this.scene.add(mesh);
     this._entries.set(res.id, { mesh, data: res, shakeTime: 0 });
   }
