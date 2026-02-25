@@ -178,6 +178,7 @@ export class SelectionManager {
 
   showContextMenu(entity, screenPos) {
     if (!this._contextMenu) return;
+    this._contextEntity = entity;
 
     const actions = ENTITY_ACTIONS[entity.type] || [];
     if (actions.length === 0) return;
@@ -246,7 +247,9 @@ export class SelectionManager {
         // 'Insert Item' requires active item — handled via existing HUD flow
         break;
       case 'crop':
-        // Harvest uses tile coords — would need separate handling
+        if (action === 'Harvest' && this._contextEntity?.cropData) {
+          net.sendHarvest(this._contextEntity.cropData.tileX, this._contextEntity.cropData.tileZ);
+        }
         break;
       case 'forage':
         // Forage collect uses tile coords
