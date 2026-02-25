@@ -184,7 +184,7 @@ io.on('connection', (socket) => {
 
   // Resources (trees/rocks)
   wrap(ACTIONS.RESOURCE_HIT, (data) => world.handleResourceHit(socket.id, data));
-  wrap('farm:treeShake', (data) => world.handleTreeShake(socket.id, data));
+  wrap(ACTIONS.TREE_SHAKE, (data) => world.handleTreeShake(socket.id, data));
 
   // Multi-tile actions
   wrap(ACTIONS.MULTI_TILL, (data) => world.handleMultiTill(socket.id, data));

@@ -609,9 +609,9 @@ async function main() {
           resources.onResourceHit(data.resourceId); // reuse shake animation
           // Spawn harvest sparkles at tree position
           {
-            const entry = resources._entries.get(data.resourceId);
-            if (entry) {
-              actionEffects.spawnHarvest(entry.data.tileX + 0.5, entry.data.tileZ + 0.5);
+            const pos = resources.getResourcePosition(data.resourceId);
+            if (pos) {
+              actionEffects.spawnHarvest(pos.tileX + 0.5, pos.tileZ + 0.5);
             }
           }
           break;

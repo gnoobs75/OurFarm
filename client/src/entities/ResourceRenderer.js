@@ -67,7 +67,13 @@ export class ResourceRenderer {
     const entry = this._entries.get(resourceId);
     if (!entry) return;
     this.scene.remove(entry.mesh);
-    entry.mesh.traverse(c => { if (c.geometry) c.geometry.dispose(); });
+    entry.mesh.traverse(c => {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) {
+        if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+        else c.material.dispose();
+      }
+    });
     this._entries.delete(resourceId);
   }
 
@@ -90,6 +96,12 @@ export class ResourceRenderer {
     }
   }
 
+  /** Get resource tile position by id */
+  getResourcePosition(resourceId) {
+    const entry = this._entries.get(resourceId);
+    return entry ? { tileX: entry.data.tileX, tileZ: entry.data.tileZ } : null;
+  }
+
   /** Find a resource at a given tile position */
   getResourceAtTile(tileX, tileZ) {
     for (const entry of this._entries.values()) {
@@ -102,7 +114,13 @@ export class ResourceRenderer {
   dispose() {
     for (const entry of this._entries.values()) {
       this.scene.remove(entry.mesh);
-      entry.mesh.traverse(c => { if (c.geometry) c.geometry.dispose(); });
+      entry.mesh.traverse(c => {
+      if (c.geometry) c.geometry.dispose();
+      if (c.material) {
+        if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+        else c.material.dispose();
+      }
+    });
     }
     this._entries.clear();
   }

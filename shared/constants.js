@@ -113,6 +113,7 @@ export const ACTIONS = {
   MULTI_WATER: 'farm:multiWater',
   MULTI_PLANT: 'farm:multiPlant',
   REST_AT_HOUSE: 'player:rest',
+  TREE_SHAKE: 'farm:treeShake',
 };
 
 // Skills

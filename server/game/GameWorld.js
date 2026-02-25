@@ -630,6 +630,7 @@ export class GameWorld {
       if (crop.tileX === data.x && crop.tileZ === data.z && crop.stage >= 3) {
         const cropData = cropsData[crop.cropType];
         if (!cropData) continue;
+        if (cropData.isSapling) continue; // Saplings auto-convert in tick
 
         const yield_ = 1 + Math.floor(Math.random() * 2);
         const quality = this._rollCropQuality(player.getSkillLevel(SKILLS.FARMING), crop.fertilizer);
@@ -1393,6 +1394,7 @@ export class GameWorld {
   handleForageCollect(socketId, data) {
     const player = this.players.get(socketId);
     if (!player) return;
+    if (!this._isPlayerInRange(player, data.x, data.z)) return;
 
     const foraging = player.currentMap === MAP_IDS.FARM ? this.farmForaging : this.townForaging;
     const spawn = foraging.collectAt(data.x, data.z);
