@@ -69,6 +69,17 @@ export class HUD {
         }
       });
 
+      // Hover tooltip
+      slot.addEventListener('mouseenter', () => {
+        const item = this.actionBarSlots[i];
+        if (!item) return;
+        const name = (item.itemId || '').replace(/_/g, ' ');
+        this._showActionBarTooltip(slot, name);
+      });
+      slot.addEventListener('mouseleave', () => {
+        this._hideActionBarTooltip();
+      });
+
       this.actionbar.appendChild(slot);
     }
     document.getElementById('ui-overlay').appendChild(this.actionbar);
@@ -177,6 +188,23 @@ export class HUD {
     for (let i = 0; i < SLOT_COUNT; i++) {
       this._renderSlot(i);
     }
+  }
+
+  _showActionBarTooltip(slot, text) {
+    if (!this._abTooltip) {
+      this._abTooltip = document.createElement('div');
+      this._abTooltip.className = 'actionbar-tooltip actionbar-tooltip-hidden';
+      document.getElementById('ui-overlay').appendChild(this._abTooltip);
+    }
+    this._abTooltip.textContent = text;
+    const rect = slot.getBoundingClientRect();
+    this._abTooltip.style.left = (rect.left + rect.width / 2) + 'px';
+    this._abTooltip.style.top = (rect.top - 8) + 'px';
+    this._abTooltip.classList.remove('actionbar-tooltip-hidden');
+  }
+
+  _hideActionBarTooltip() {
+    if (this._abTooltip) this._abTooltip.classList.add('actionbar-tooltip-hidden');
   }
 
   updateStats(data) {

@@ -132,6 +132,25 @@ body {
   text-shadow: 0 0 3px #000;
 }
 
+/* Action bar hover tooltip */
+.actionbar-tooltip {
+  position: fixed;
+  background: rgba(20, 15, 10, 0.9);
+  border: 1px solid rgba(139, 105, 20, 0.5);
+  color: #f5d142;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  transform: translateX(-50%) translateY(-100%);
+  pointer-events: none;
+  z-index: 110;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.actionbar-tooltip-hidden {
+  opacity: 0;
+}
+
 /* ═══════════════════════════════════════════
    BACKPACK — 30-slot inventory modal (6×5)
    ═══════════════════════════════════════════ */
