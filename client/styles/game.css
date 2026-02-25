@@ -694,6 +694,7 @@ body {
 }
 
 .entity-tooltip.hidden {
+  display: block !important;
   opacity: 0;
   pointer-events: none;
 }

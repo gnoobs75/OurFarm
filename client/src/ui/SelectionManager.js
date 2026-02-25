@@ -2,6 +2,7 @@
 // Hover indicator, entity tooltips, and context menus.
 
 import * as THREE from 'three';
+import { SEASON_NAMES, STAGE_NAMES } from '@shared/constants.js';
 
 const ENTITY_ACTIONS = {
   animal:  ['Feed', 'Collect', 'Pet'],
@@ -31,6 +32,7 @@ export class SelectionManager {
     this._hoverTime = 0;
 
     this.onGroom = null;
+    this._contextEntity = null;
 
     // Close context menu on click outside
     this._onDocClick = (e) => {
@@ -260,8 +262,7 @@ export class SelectionManager {
   _buildCropTooltipHTML(entity) {
     const { cropData, staticData } = entity;
     const stage = cropData.stage;
-    const stageNames = ['Seed', 'Sprout', 'Mature', 'Harvestable'];
-    const stageName = stageNames[stage] || 'Unknown';
+    const stageName = STAGE_NAMES[stage] || 'Unknown';
 
     // Overall progress: stage contributes 0-3, growth within stage 0-1
     const overallProgress = Math.min(1, (stage + cropData.growth) / 3);
@@ -288,8 +289,7 @@ export class SelectionManager {
         const remaining = this._estimateRemainingHours(cropData, staticData);
         const daysLeft = Math.ceil(remaining / 24);
         const projDay = (time.day || 1) + daysLeft;
-        const seasonNames = ['Spring', 'Summer', 'Fall', 'Winter'];
-        const season = seasonNames[time.season] || '';
+        const season = SEASON_NAMES[time.season] || '';
         maturityLine = `<div class="tooltip-detail">\uD83D\uDCC5 Matures: ~Day ${projDay} ${season}</div>`;
       }
     } else if (stage >= 3) {
@@ -297,8 +297,7 @@ export class SelectionManager {
     }
 
     // Season info
-    const seasonNames = ['Spring', 'Summer', 'Fall', 'Winter'];
-    const seasons = (staticData.season || []).map(s => seasonNames[s]).join(', ');
+    const seasons = (staticData.season || []).map(s => SEASON_NAMES[s]).join(', ');
 
     // Sell price and regrow info
     const sellLine = staticData.sellPrice ? `Sells: ${staticData.sellPrice}g` : '';
